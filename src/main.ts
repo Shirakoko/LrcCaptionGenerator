@@ -10,6 +10,8 @@ import { CanvasDrag } from './ui/canvasDrag.ts';
 const lrcInput = document.getElementById('lrc-input') as HTMLTextAreaElement;
 const lrcUploadBtn = document.getElementById('lrc-upload-btn') as HTMLButtonElement;
 const lrcFile = document.getElementById('lrc-file') as HTMLInputElement;
+const randomEnable = document.getElementById('random-enable') as HTMLInputElement;
+const seedRow = document.getElementById('seed-row') as HTMLDivElement;
 const seedInput = document.getElementById('seed-input') as HTMLInputElement;
 const reseedBtn = document.getElementById('reseed-btn') as HTMLButtonElement;
 const resolutionSelect = document.getElementById('resolution-select') as HTMLSelectElement;
@@ -138,6 +140,13 @@ lrcFile.addEventListener('change', () => {
   reader.readAsText(file, 'utf-8');
 });
 
+// ── Random enable toggle ──────────────────────────────────────────────────────
+function syncSeedRowVisibility(): void {
+  seedRow.hidden = !randomEnable.checked;
+}
+randomEnable.addEventListener('change', syncSeedRowVisibility);
+syncSeedRowVisibility();
+
 // ── Reseed ────────────────────────────────────────────────────────────────────
 reseedBtn.addEventListener('click', () => {
   seedInput.value = String(Math.floor(Math.random() * 0xffffffff));
@@ -238,7 +247,7 @@ buildBtn.addEventListener('click', () => {
   const prevOverrides = scene?.getOverrideMap() ?? {};
   scene?.stop();
   scene = new SceneController(mainCanvas, cfg);
-  scene.build(lyrics, { seed: getSeed(), randomLayout: true, overrides: prevOverrides });
+  scene.build(lyrics, { seed: getSeed(), randomLayout: true, staticMode: !randomEnable.checked, overrides: prevOverrides });
   scene.seek(0);
   updateTransport();
 

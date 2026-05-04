@@ -23,17 +23,22 @@
         </section>
 
         <section class="panel-section">
-          <label for="seed-input">随机种子</label>
-          <div class="row">
-            <input id="seed-input" type="text" placeholder="留空则随机" />
-            <button id="reseed-btn" type="button" title="随机种子">🎲</button>
+          <div class="row" id="random-row">
+            <label class="checkbox-label">
+              <input id="random-enable" type="checkbox" checked />
+              启用随机特效
+            </label>
+            <div id="seed-row" class="seed-row-inner">
+              <input id="seed-input" type="text" placeholder="留空则随机" />
+              <button id="reseed-btn" type="button" title="随机种子">🎲</button>
+            </div>
           </div>
         </section>
 
         <section class="panel-section">
-          <label>画布尺寸</label>
           <div class="row">
-            <select id="resolution-select">
+            <label for="resolution-select">画布尺寸</label>
+            <select id="resolution-select" style="flex:1; width:auto;">
               <option value="1920x1080">1920×1080 (16:9)</option>
               <option value="1080x1920">1080×1920 (9:16)</option>
               <option value="1080x1080">1080×1080 (1:1)</option>
@@ -41,8 +46,6 @@
             </select>
           </div>
         </section>
-
-        <section class="panel-section">
           <label>背景</label>
           <div class="tab-bar">
             <button id="bg-tab-color" class="tab active" type="button">纯色</button>
@@ -93,15 +96,13 @@
           <div class="row">
             <label for="fill-color">字色</label>
             <input id="fill-color" type="color" value="#ffffff" />
+            <label for="stroke-color">描边色</label>
+            <input id="stroke-color" type="color" value="#000000" />
           </div>
           <div class="row">
             <label for="stroke-width">描边</label>
             <input id="stroke-width" type="range" min="0" max="8" step="0.5" value="0" />
             <span id="stroke-width-val">0</span>
-          </div>
-          <div class="row">
-            <label for="stroke-color">描边色</label>
-            <input id="stroke-color" type="color" value="#000000" />
           </div>
         </section>
 

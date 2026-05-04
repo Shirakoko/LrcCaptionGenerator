@@ -18,6 +18,7 @@ export interface LineParams {
 export interface SceneOptions {
   seed?: number | string;
   randomLayout?: boolean;
+  staticMode?: boolean;
   overrides?: OverrideMap;
 }
 
@@ -35,6 +36,7 @@ export class SceneController {
   private lyrics: LyricLine[] = [];
   private seedVal: number = 0;
   private randomLayout: boolean = true;
+  private isStatic: boolean = false;
   private overrideMap: OverrideMap = {};
   private lineParams: LineParams[] = [];
 
@@ -52,6 +54,7 @@ export class SceneController {
       ? seedFromString(opts.seed)
       : (opts.seed ?? Date.now());
     this.randomLayout = opts.randomLayout !== false;
+    this.isStatic = opts.staticMode ?? false;
     this.overrideMap = opts.overrides ?? {};
     this._buildTimeline();
   }
@@ -71,7 +74,15 @@ export class SceneController {
     const masterTl = gsap.timeline({ paused: true });
     this.masterTl = masterTl;
 
-    const baseLayoutOpts = this.randomLayout ? {} : { align: 'center' as const, rotation: 0 };
+    const baseLayoutOpts = this.isStatic
+      ? {
+          align:               'center' as const,
+          rotation:            0,
+          fontSize:            Math.round(this.cfg.height / 15),
+          yZone:               [0.85, 0.85] as [number, number],
+          letterSpacingExtra:  0,
+        }
+      : this.randomLayout ? {} : { align: 'center' as const, rotation: 0 };
 
     for (let i = 0; i < this.lyrics.length; i++) {
       const lyric = this.lyrics[i];
@@ -92,17 +103,25 @@ export class SceneController {
       const durSec = lyric.duration / 1000;
       const exitSec = startSec + durSec - 0.5;
 
-      const effects = pickEffects(rng, override?.effects);
+      const hasEffectOverride = !!(override?.effects?.entrance || override?.effects?.idle || override?.effects?.exit);
+      const effects: EffectSet = (this.isStatic && !hasEffectOverride)
+        ? { entrance: 'fadeIn', idle: 'none', exit: 'fadeOut' }
+        : pickEffects(rng, override?.effects);
+
+      const entranceParams = (this.isStatic && !hasEffectOverride) ? { duration: 0.15, stagger: 0 } : override?.effects?.entranceParams;
+      const idleParams     = override?.effects?.idleParams;
+      const exitParams     = (this.isStatic && !hasEffectOverride) ? { duration: 0.2 }              : override?.effects?.exitParams;
+
       this.lineParams.push({ layout: { ...lineState.layout }, effects });
 
-      buildEntrance(effects.entrance, lineState.chars, masterTl, startSec, rng, override?.effects?.entranceParams);
+      buildEntrance(effects.entrance, lineState.chars, masterTl, startSec, rng, entranceParams);
 
       const idleDur = Math.max(0, durSec - 0.6 - 0.5);
       if (idleDur > 0.3) {
-        buildIdleTween(effects.idle, lineState, masterTl, startSec + 0.6, idleDur, override?.effects?.idleParams);
+        buildIdleTween(effects.idle, lineState, masterTl, startSec + 0.6, idleDur, idleParams);
       }
 
-      buildExit(effects.exit, lineState, masterTl, exitSec, rng, override?.effects?.exitParams);
+      buildExit(effects.exit, lineState, masterTl, exitSec, rng, exitParams);
     }
 
     masterTl.eventCallback('onComplete', () => {

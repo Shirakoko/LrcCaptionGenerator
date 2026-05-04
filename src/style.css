@@ -286,6 +286,23 @@ progress { width: 100%; height: 6px; border-radius: 3px; }
   cursor: pointer;
 }
 
+.seed-row-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.seed-row-inner[hidden] { display: none; }
+
+#random-row { min-height: 36px; }
+
+.seed-row-inner input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ===== Right Panel (Line Editor) ===== */
 #right-panel {
   position: relative;
