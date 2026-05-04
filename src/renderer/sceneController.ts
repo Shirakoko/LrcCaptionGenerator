@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 import type { LyricLine } from '../parser/lrcParser.ts';
-import type { LineState } from '../effects/types.ts';
+import type { LineState, OverrideMap, EffectSet, LineLayout, LineOverride } from '../effects/types.ts';
 import { pickEffects } from '../effects/types.ts';
 import { buildEntrance } from '../effects/entrance.ts';
 import { buildIdleTween } from '../effects/idle.ts';
@@ -10,9 +10,15 @@ import { renderFrame } from './canvasRenderer.ts';
 import type { RenderConfig } from './canvasRenderer.ts';
 import { Prng, seedFromString } from '../random/prng.ts';
 
+export interface LineParams {
+  layout: LineLayout;
+  effects: EffectSet;
+}
+
 export interface SceneOptions {
   seed?: number | string;
   randomLayout?: boolean;
+  overrides?: OverrideMap;
 }
 
 export class SceneController {
@@ -25,6 +31,13 @@ export class SceneController {
   private isPlaying = false;
   transparentBg = false;
 
+  // Stored state for rebuilding
+  private lyrics: LyricLine[] = [];
+  private seedVal: number = 0;
+  private randomLayout: boolean = true;
+  private overrideMap: OverrideMap = {};
+  private lineParams: LineParams[] = [];
+
   constructor(canvas: HTMLCanvasElement, cfg: RenderConfig) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -34,26 +47,37 @@ export class SceneController {
   }
 
   build(lyrics: LyricLine[], opts: SceneOptions = {}): void {
-    this.stop();
-    this.activeLines = [];
-
-    const seedVal = typeof opts.seed === 'string'
+    this.lyrics = lyrics;
+    this.seedVal = typeof opts.seed === 'string'
       ? seedFromString(opts.seed)
       : (opts.seed ?? Date.now());
+    this.randomLayout = opts.randomLayout !== false;
+    this.overrideMap = opts.overrides ?? {};
+    this._buildTimeline();
+  }
+
+  private _buildTimeline(): void {
+    this.stop();
+    this.activeLines = [];
+    this.lineParams = [];
 
     const masterTl = gsap.timeline({ paused: true });
     this.masterTl = masterTl;
 
-    for (let i = 0; i < lyrics.length; i++) {
-      const lyric = lyrics[i];
-      const rng = new Prng(seedVal ^ (i * 0x9e3779b9));
+    const baseLayoutOpts = this.randomLayout ? {} : { align: 'center' as const, rotation: 0 };
+
+    for (let i = 0; i < this.lyrics.length; i++) {
+      const lyric = this.lyrics[i];
+      const rng = new Prng(this.seedVal ^ (i * 0x9e3779b9));
+      const override = this.overrideMap[i];
 
       const lineState = buildLineState(
         lyric.text,
         this.ctx,
         this.cfg,
         rng,
-        opts.randomLayout !== false ? {} : { align: 'center', rotation: 0 },
+        baseLayoutOpts,
+        override?.layout,
       );
       this.activeLines.push(lineState);
 
@@ -61,7 +85,8 @@ export class SceneController {
       const durSec = lyric.duration / 1000;
       const exitSec = startSec + durSec - 0.5;
 
-      const effects = pickEffects(rng);
+      const effects = pickEffects(rng, override?.effects);
+      this.lineParams.push({ layout: { ...lineState.layout }, effects });
 
       buildEntrance(effects.entrance, lineState.chars, masterTl, startSec, rng);
 
@@ -90,6 +115,56 @@ export class SceneController {
     });
   }
 
+  /** 为指定行设置覆盖参数并立即重建时间轴 */
+  setOverride(index: number, override: LineOverride): void {
+    const prevTime = this.currentTime;
+    this.overrideMap[index] = override;
+    this._buildTimeline();
+    this.seek(prevTime);
+  }
+
+  /** 清除所有覆盖并重建（一次性，避免逐行重建） */
+  clearAllOverrides(): void {
+    const prevTime = this.currentTime;
+    this.overrideMap = {};
+    this._buildTimeline();
+    this.seek(prevTime);
+  }
+
+  /** 清除指定行的覆盖，恢复随机生成值 */
+  clearOverride(index: number): void {
+    const prevTime = this.currentTime;
+    delete this.overrideMap[index];
+    this._buildTimeline();
+    this.seek(prevTime);
+  }
+
+  /** 读取指定行实际生效的布局和特效参数（已含 override） */
+  getLineParams(index: number): LineParams | null {
+    return this.lineParams[index] ?? null;
+  }
+
+  hasOverride(index: number): boolean {
+    return index in this.overrideMap;
+  }
+
+  getOverride(index: number): LineOverride | undefined {
+    return this.overrideMap[index];
+  }
+
+  getLyrics(): LyricLine[] {
+    return this.lyrics;
+  }
+
+  /** 返回覆盖表的浅拷贝，用于跨 build 保留 */
+  getOverrideMap(): OverrideMap {
+    return { ...this.overrideMap };
+  }
+
+  get lineCount(): number {
+    return this.lyrics.length;
+  }
+
   play(): void {
     this.masterTl?.play();
   }
@@ -112,12 +187,10 @@ export class SceneController {
     cancelAnimationFrame(this.rafId);
   }
 
-  /** 导出当前帧为 PNG DataURL */
   exportFramePng(): string {
     return this.canvas.toDataURL('image/png');
   }
 
-  /** 跳到指定时间并导出 PNG */
   exportFrameAt(timeSec: number): string {
     this.seek(timeSec);
     return this.exportFramePng();

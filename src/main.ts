@@ -1,8 +1,9 @@
-import './style.css';
 import { parseLrc } from './parser/lrcParser.ts';
-import { SceneController } from './renderer/sceneController.ts';
 import type { RenderConfig } from './renderer/canvasRenderer.ts';
 import { DEFAULT_CONFIG } from './renderer/canvasRenderer.ts';
+import { SceneController } from './renderer/sceneController.ts';
+import './style.css';
+import { LineEditorUI } from './ui/lineEditor.ts';
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const lrcInput = document.getElementById('lrc-input') as HTMLTextAreaElement;
@@ -52,9 +53,14 @@ const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
 const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement;
 const seekBar = document.getElementById('seek-bar') as HTMLInputElement;
 const timeDisplay = document.getElementById('time-display') as HTMLSpanElement;
+const rightPanel = document.getElementById('right-panel') as HTMLElement;
+const rightPanelResize = document.getElementById('right-panel-resize') as HTMLElement;
+const lineEditorList = document.getElementById('line-editor-list') as HTMLDivElement;
+const leClearAllBtn = document.getElementById('le-clear-all-btn') as HTMLButtonElement;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let scene: SceneController | null = null;
+let lineEditor: LineEditorUI | null = null;
 let seekRafId = 0;
 let bgImage: HTMLImageElement | null = null;
 let bgMode: 'color' | 'image' = 'color';
@@ -223,11 +229,22 @@ buildBtn.addEventListener('click', () => {
   if (lyrics.length === 0) { alert('未能解析到任何歌词行，请检查 LRC 格式'); return; }
 
   const cfg = buildConfig();
+
+  // 保留已有的手动编辑，跨 build 传递给新 scene
+  const prevOverrides = scene?.getOverrideMap() ?? {};
   scene?.stop();
   scene = new SceneController(mainCanvas, cfg);
-  scene.build(lyrics, { seed: getSeed(), randomLayout: true });
+  scene.build(lyrics, { seed: getSeed(), randomLayout: true, overrides: prevOverrides });
   scene.seek(0);
   updateTransport();
+
+  // 显示并（重）初始化行编辑器
+  rightPanel.hidden = false;
+  if (lineEditor) {
+    lineEditor.update(scene, cfg.width, cfg.height);
+  } else {
+    lineEditor = new LineEditorUI(lineEditorList, scene, cfg.width, cfg.height);
+  }
 });
 
 // ── Transport ─────────────────────────────────────────────────────────────────
@@ -424,4 +441,39 @@ exportMovBtn.addEventListener('click', async () => {
 // ── Export cancel ─────────────────────────────────────────────────────────────
 exportCancelBtn.addEventListener('click', () => {
   exportCancelled = true;
+});
+
+// ── Line editor: clear all overrides ─────────────────────────────────────────
+leClearAllBtn.addEventListener('click', () => {
+  if (!scene) return;
+  scene.clearAllOverrides();
+  lineEditor?.refresh();
+});
+
+// ── Right panel resize ────────────────────────────────────────────────────────
+rightPanelResize.addEventListener('mousedown', (e) => {
+  const startX = e.clientX;
+  const startWidth = rightPanel.offsetWidth;
+
+  rightPanelResize.classList.add('is-resizing');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+
+  const onMove = (ev: MouseEvent) => {
+    const dx = startX - ev.clientX;           // 向左拖 → 面板变宽
+    const newWidth = Math.max(300, Math.min(600, startWidth + dx));
+    rightPanel.style.width = `${newWidth}px`;
+  };
+
+  const onUp = () => {
+    rightPanelResize.classList.remove('is-resizing');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  };
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+  e.preventDefault();
 });

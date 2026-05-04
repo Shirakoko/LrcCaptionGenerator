@@ -67,18 +67,42 @@ export interface EffectSet {
   exit: ExitName;
 }
 
-const ENTRANCES: EntranceName[] = [
+export const ENTRANCES: EntranceName[] = [
   'typewriter', 'slideLeft', 'slideRight', 'slideUp', 'slideDown',
   'scalePop', 'scatter', 'flipX', 'blurFade', 'wave',
 ];
-const IDLES: IdleName[] = ['float', 'charJitter', 'breathe', 'none'];
-const EXITS: ExitName[] = ['fadeOut', 'floatUp', 'floatDown', 'explode', 'shrink', 'afterimage'];
+export const IDLES: IdleName[] = ['float', 'charJitter', 'breathe', 'none'];
+export const EXITS: ExitName[] = ['fadeOut', 'floatUp', 'floatDown', 'explode', 'shrink', 'afterimage'];
 
-export function pickEffects(rng: Prng): EffectSet {
+// ── Override types ────────────────────────────────────────────────────────────
+
+export interface LayoutOverride {
+  x?: number;
+  y?: number;
+  fontSize?: number;
+  align?: Align;
+  letterSpacingExtra?: number;
+  rotation?: number;
+}
+
+export interface EffectOverride {
+  entrance?: EntranceName;
+  idle?: IdleName;
+  exit?: ExitName;
+}
+
+export interface LineOverride {
+  layout?: LayoutOverride;
+  effects?: EffectOverride;
+}
+
+export type OverrideMap = Record<number, LineOverride>;
+
+export function pickEffects(rng: Prng, override?: EffectOverride): EffectSet {
   return {
-    entrance: rng.pick(ENTRANCES),
-    idle: rng.pick(IDLES),
-    exit: rng.pick(EXITS),
+    entrance: override?.entrance ?? rng.pick(ENTRANCES),
+    idle: override?.idle ?? rng.pick(IDLES),
+    exit: override?.exit ?? rng.pick(EXITS),
   };
 }
 
