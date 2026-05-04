@@ -4,7 +4,7 @@ import type { Prng } from '../random/prng.ts';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Timeline = any;
 
-const DUR = 0.45;
+type P = Record<string, number>;
 
 export function buildExit(
   name: ExitName,
@@ -12,42 +12,53 @@ export function buildExit(
   tl: Timeline,
   at: number,
   rng: Prng,
+  params: P = {},
 ): void {
   const chars = line.chars;
   const n = chars.length;
 
   switch (name) {
     case 'fadeOut': {
-      tl.to(line, { alpha: 0, duration: DUR, ease: 'power1.in' }, at);
+      const duration = params.duration ?? 0.45;
+      tl.to(line, { alpha: 0, duration, ease: 'power1.in' }, at);
       break;
     }
 
     case 'floatUp': {
+      const distance = params.distance ?? 60;
+      const duration = params.duration ?? 0.45;
+      const stagger  = params.stagger  ?? 0.03;
       for (let i = 0; i < n; i++) {
         const c = chars[i];
-        tl.to(c, { y: c.baseY - 60, alpha: 0, duration: DUR, ease: 'power2.in' }, at + i * 0.03);
+        tl.to(c, { y: c.baseY - distance, alpha: 0, duration, ease: 'power2.in' }, at + i * stagger);
       }
       break;
     }
 
     case 'floatDown': {
+      const distance = params.distance ?? 60;
+      const duration = params.duration ?? 0.45;
+      const stagger  = params.stagger  ?? 0.03;
       for (let i = 0; i < n; i++) {
         const c = chars[i];
-        tl.to(c, { y: c.baseY + 60, alpha: 0, duration: DUR, ease: 'power2.in' }, at + i * 0.03);
+        tl.to(c, { y: c.baseY + distance, alpha: 0, duration, ease: 'power2.in' }, at + i * stagger);
       }
       break;
     }
 
     case 'explode': {
+      const spreadX  = params.spreadX  ?? 200;
+      const spreadY  = params.spreadY  ?? 150;
+      const duration = params.duration ?? 0.45;
       for (let i = 0; i < n; i++) {
         const c = chars[i];
         tl.to(c, {
-          x: c.baseX + rng.range(-200, 200),
-          y: c.baseY + rng.range(-150, 150),
+          x: c.baseX + rng.range(-spreadX, spreadX),
+          y: c.baseY + rng.range(-spreadY, spreadY),
           alpha: 0,
           scaleX: rng.range(0.5, 2),
           scaleY: rng.range(0.5, 2),
-          duration: DUR,
+          duration,
           ease: 'power2.in',
         }, at + rng.range(0, 0.1));
       }
@@ -55,19 +66,33 @@ export function buildExit(
     }
 
     case 'shrink': {
+      const duration = params.duration ?? 0.45;
+      const stagger  = params.stagger  ?? 0.04;
       for (let i = 0; i < n; i++) {
         const c = chars[i];
-        tl.to(c, { scaleX: 0, scaleY: 0, alpha: 0, duration: DUR, ease: 'power2.in' }, at + i * 0.04);
+        tl.to(c, { scaleX: 0, scaleY: 0, alpha: 0, duration, ease: 'power2.in' }, at + i * stagger);
       }
       break;
     }
 
     case 'afterimage': {
-      // 快速淡出 + 轻微右移残影
-      tl.to(line, { alpha: 0, duration: DUR * 0.6, ease: 'power3.in' }, at);
+      const trailDistance = params.trailDistance ?? 20;
+      const duration      = params.duration      ?? 0.45;
+      tl.to(line, { alpha: 0, duration: duration * 0.6, ease: 'power3.in' }, at);
       for (let i = 0; i < n; i++) {
         const c = chars[i];
-        tl.to(c, { x: c.baseX + 20, duration: DUR, ease: 'power1.in' }, at);
+        tl.to(c, { x: c.baseX + trailDistance, duration, ease: 'power1.in' }, at);
+      }
+      break;
+    }
+
+    case 'blurOut': {
+      const blurAmount = params.blurAmount ?? 20;
+      const duration   = params.duration   ?? 0.45;
+      const stagger    = params.stagger    ?? 0.03;
+      for (let i = 0; i < n; i++) {
+        const c = chars[i];
+        tl.to(c, { blur: blurAmount, alpha: 0, duration, ease: 'power2.in' }, at + i * stagger);
       }
       break;
     }

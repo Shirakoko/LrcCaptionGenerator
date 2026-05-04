@@ -95,14 +95,14 @@ export class SceneController {
       const effects = pickEffects(rng, override?.effects);
       this.lineParams.push({ layout: { ...lineState.layout }, effects });
 
-      buildEntrance(effects.entrance, lineState.chars, masterTl, startSec, rng);
+      buildEntrance(effects.entrance, lineState.chars, masterTl, startSec, rng, override?.effects?.entranceParams);
 
       const idleDur = Math.max(0, durSec - 0.6 - 0.5);
       if (idleDur > 0.3) {
-        buildIdleTween(effects.idle, lineState, masterTl, startSec + 0.6, idleDur);
+        buildIdleTween(effects.idle, lineState, masterTl, startSec + 0.6, idleDur, override?.effects?.idleParams);
       }
 
-      buildExit(effects.exit, lineState, masterTl, exitSec, rng);
+      buildExit(effects.exit, lineState, masterTl, exitSec, rng, override?.effects?.exitParams);
     }
 
     masterTl.eventCallback('onComplete', () => {

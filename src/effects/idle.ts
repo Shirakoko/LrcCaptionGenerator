@@ -3,12 +3,15 @@ import type { LineState, IdleName } from './types.ts';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Timeline = any;
 
+type P = Record<string, number>;
+
 export function buildIdleTween(
   name: IdleName,
   line: LineState,
   tl: Timeline,
   at: number,
   duration: number,
+  params: P = {},
 ): void {
   if (name === 'none') return;
 
@@ -17,8 +20,8 @@ export function buildIdleTween(
 
   switch (name) {
     case 'float': {
-      const amp = 6;
-      const period = 2.5;
+      const amp    = params.amplitude ?? 6;
+      const period = params.period    ?? 2.5;
       tl.to(line, {
         scaleY: 1.02,
         duration: period / 2,
@@ -40,11 +43,13 @@ export function buildIdleTween(
     }
 
     case 'charJitter': {
+      const amp   = params.amplitude ?? 3;
+      const speed = params.speed     ?? 0.12;
       for (let i = 0; i < n; i++) {
-        const c = chars[i];
-        const period = 0.12 + (i % 3) * 0.04;
+        const c      = chars[i];
+        const period = speed + (i % 3) * 0.04;
         tl.to(c, {
-          y: c.baseY - 3,
+          y: c.baseY - amp,
           duration: period,
           ease: 'none',
           yoyo: true,
@@ -55,10 +60,11 @@ export function buildIdleTween(
     }
 
     case 'breathe': {
-      const period = 2;
+      const scale  = params.scale  ?? 1.04;
+      const period = params.period ?? 2;
       tl.to(line, {
-        scaleX: 1.04,
-        scaleY: 1.04,
+        scaleX: scale,
+        scaleY: scale,
         duration: period / 2,
         ease: 'sine.inOut',
         yoyo: true,

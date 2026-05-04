@@ -45,7 +45,9 @@ export type EntranceName =
   | 'scatter'
   | 'flipX'
   | 'blurFade'
-  | 'wave';
+  | 'wave'
+  | 'fadeIn'
+  | 'glitch';
 
 export type IdleName =
   | 'float'
@@ -59,7 +61,8 @@ export type ExitName =
   | 'floatDown'
   | 'explode'
   | 'shrink'
-  | 'afterimage';
+  | 'afterimage'
+  | 'blurOut';
 
 export interface EffectSet {
   entrance: EntranceName;
@@ -69,10 +72,10 @@ export interface EffectSet {
 
 export const ENTRANCES: EntranceName[] = [
   'typewriter', 'slideLeft', 'slideRight', 'slideUp', 'slideDown',
-  'scalePop', 'scatter', 'flipX', 'blurFade', 'wave',
+  'scalePop', 'scatter', 'flipX', 'blurFade', 'wave', 'fadeIn', 'glitch',
 ];
 export const IDLES: IdleName[] = ['float', 'charJitter', 'breathe', 'none'];
-export const EXITS: ExitName[] = ['fadeOut', 'floatUp', 'floatDown', 'explode', 'shrink', 'afterimage'];
+export const EXITS: ExitName[] = ['fadeOut', 'floatUp', 'floatDown', 'explode', 'shrink', 'afterimage', 'blurOut'];
 
 // ── Override types ────────────────────────────────────────────────────────────
 
@@ -87,8 +90,11 @@ export interface LayoutOverride {
 
 export interface EffectOverride {
   entrance?: EntranceName;
+  entranceParams?: Record<string, number>;
   idle?: IdleName;
+  idleParams?: Record<string, number>;
   exit?: ExitName;
+  exitParams?: Record<string, number>;
 }
 
 export interface LineOverride {

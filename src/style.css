@@ -495,6 +495,23 @@ progress { width: 100%; height: 6px; border-radius: 3px; }
   flex-shrink: 0;
 }
 
+.le-effect-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.le-effect-params {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+  margin-left: 4px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
 .le-align-group {
   display: flex;
   gap: 3px;
