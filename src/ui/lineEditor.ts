@@ -30,17 +30,20 @@ export class LineEditorUI {
   private canvasHeight: number;
   private expandedIndex = -1;
   private selectedIndex = -1;
+  private onSeek: ((timeSec: number) => void) | undefined;
 
   constructor(
     container: HTMLElement,
     scene: SceneController,
     canvasWidth: number,
     canvasHeight: number,
+    onSeek?: (timeSec: number) => void,
   ) {
     this.container = container;
     this.scene = scene;
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
+    this.onSeek = onSeek;
     this._render();
   }
 
@@ -113,6 +116,10 @@ export class LineEditorUI {
     header.append(dot, timeEl, textEl, toggleBtn);
     header.addEventListener('click', () => {
       this.expandedIndex = this.expandedIndex === index ? -1 : index;
+      this.selectedIndex = index;
+      const timeSec = timeMs / 1000;
+      this.scene.seek(timeSec);
+      this.onSeek?.(timeSec);
       this._render();
     });
 

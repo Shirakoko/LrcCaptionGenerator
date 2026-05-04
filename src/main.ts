@@ -247,7 +247,10 @@ buildBtn.addEventListener('click', () => {
   if (lineEditor) {
     lineEditor.update(scene, cfg.width, cfg.height);
   } else {
-    lineEditor = new LineEditorUI(lineEditorList, scene, cfg.width, cfg.height);
+    lineEditor = new LineEditorUI(lineEditorList, scene, cfg.width, cfg.height, (t) => {
+      if (audio.src) audio.currentTime = t;
+      updateTransport();
+    });
   }
 
   // 初始化 / 更新 canvas 拖拽
