@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG } from './renderer/canvasRenderer.ts';
 import { SceneController } from './renderer/sceneController.ts';
 import './style.css';
 import { LineEditorUI } from './ui/lineEditor.ts';
+import { CanvasDrag } from './ui/canvasDrag.ts';
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const lrcInput = document.getElementById('lrc-input') as HTMLTextAreaElement;
@@ -61,6 +62,7 @@ const leClearAllBtn = document.getElementById('le-clear-all-btn') as HTMLButtonE
 // ── State ─────────────────────────────────────────────────────────────────────
 let scene: SceneController | null = null;
 let lineEditor: LineEditorUI | null = null;
+let canvasDrag: CanvasDrag | null = null;
 let seekRafId = 0;
 let bgImage: HTMLImageElement | null = null;
 let bgMode: 'color' | 'image' = 'color';
@@ -245,6 +247,12 @@ buildBtn.addEventListener('click', () => {
   } else {
     lineEditor = new LineEditorUI(lineEditorList, scene, cfg.width, cfg.height);
   }
+
+  // 初始化 / 更新 canvas 拖拽
+  if (!canvasDrag) {
+    canvasDrag = new CanvasDrag(mainCanvas);
+  }
+  canvasDrag.update(scene, lineEditor);
 });
 
 // ── Transport ─────────────────────────────────────────────────────────────────

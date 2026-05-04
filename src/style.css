@@ -557,3 +557,16 @@ progress { width: 100%; height: 6px; border-radius: 3px; }
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ===== Canvas drag: selected line highlight ===== */
+.le-item--selected {
+  border-color: #4ec9c0;
+}
+
+.le-item--selected .le-header {
+  background: #0f2b2a;
+}
+
+.le-item--selected .le-header:hover {
+  background: #1a3a38;
+}

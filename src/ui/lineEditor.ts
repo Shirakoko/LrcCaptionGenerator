@@ -29,6 +29,7 @@ export class LineEditorUI {
   private canvasWidth: number;
   private canvasHeight: number;
   private expandedIndex = -1;
+  private selectedIndex = -1;
 
   constructor(
     container: HTMLElement,
@@ -54,7 +55,23 @@ export class LineEditorUI {
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
     this.expandedIndex = -1;
+    this.selectedIndex = -1;
     this._render();
+  }
+
+  /** 高亮选中行并滚动到可见区域（直接 DOM 操作，不重建列表） */
+  setSelected(index: number | null): void {
+    const newIdx = index ?? -1;
+    if (this.selectedIndex >= 0) {
+      (this.container.children[this.selectedIndex] as HTMLElement)
+        ?.classList.remove('le-item--selected');
+    }
+    this.selectedIndex = newIdx;
+    if (this.selectedIndex >= 0) {
+      const item = this.container.children[this.selectedIndex] as HTMLElement;
+      item?.classList.add('le-item--selected');
+      item?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }
 
   private _render(): void {
@@ -68,9 +85,12 @@ export class LineEditorUI {
   private _buildItem(index: number, timeMs: number, text: string): HTMLElement {
     const isModified = this.scene.hasOverride(index);
     const isExpanded = this.expandedIndex === index;
+    const isSelected = this.selectedIndex === index;
 
     const item = document.createElement('div');
-    item.className = 'le-item' + (isModified ? ' le-item--modified' : '');
+    item.className = 'le-item'
+      + (isModified ? ' le-item--modified' : '')
+      + (isSelected ? ' le-item--selected' : '');
 
     // ── Header ──────────────────────────────────────────────────────────────
     const header = document.createElement('div');

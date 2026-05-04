@@ -165,6 +165,28 @@ export class SceneController {
     return this.lyrics.length;
   }
 
+  get playing(): boolean {
+    return this.isPlaying;
+  }
+
+  get lines(): readonly LineState[] {
+    return this.activeLines;
+  }
+
+  updateLinePositionLive(index: number, x: number, y: number): void {
+    const line = this.activeLines[index];
+    if (!line) return;
+    const dx = x - line.layout.x;
+    const dy = y - line.layout.y;
+    line.layout.x = x;
+    line.layout.y = y;
+    for (const c of line.chars) {
+      c.x += dx; c.y += dy;
+      c.baseX += dx; c.baseY += dy;
+    }
+    renderFrame(this.ctx, this.activeLines, this.cfg, this.transparentBg);
+  }
+
   play(): void {
     this.masterTl?.play();
   }
