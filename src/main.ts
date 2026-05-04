@@ -50,8 +50,7 @@ const exportLabel = document.getElementById('export-label') as HTMLSpanElement;
 const exportCancelBtn = document.getElementById('export-cancel-btn') as HTMLButtonElement;
 const exportMovNote = document.getElementById('export-mov-note') as HTMLDivElement;
 const mainCanvas = document.getElementById('main-canvas') as HTMLCanvasElement;
-const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
-const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement;
+const playPauseBtn = document.getElementById('play-pause-btn') as HTMLButtonElement;
 const seekBar = document.getElementById('seek-bar') as HTMLInputElement;
 const timeDisplay = document.getElementById('time-display') as HTMLSpanElement;
 const rightPanel = document.getElementById('right-panel') as HTMLElement;
@@ -110,9 +109,11 @@ function updateTransport(): void {
   const dur = scene.duration;
   timeDisplay.textContent = `${fmt(cur)} / ${fmt(dur)} s`;
   seekBar.value = dur > 0 ? String((cur / dur) * 100) : '0';
+  playPauseBtn.textContent = scene.playing ? '⏸ 暂停' : '▶ 播放';
 }
 
 function startTransportLoop(): void {
+  playPauseBtn.textContent = '⏸ 暂停';
   const loop = () => {
     updateTransport();
     seekRafId = requestAnimationFrame(loop);
@@ -122,6 +123,7 @@ function startTransportLoop(): void {
 
 function stopTransportLoop(): void {
   cancelAnimationFrame(seekRafId);
+  playPauseBtn.textContent = '▶ 播放';
 }
 
 // ── LRC upload ────────────────────────────────────────────────────────────────
@@ -256,23 +258,21 @@ buildBtn.addEventListener('click', () => {
 });
 
 // ── Transport ─────────────────────────────────────────────────────────────────
-playBtn.addEventListener('click', () => {
+playPauseBtn.addEventListener('click', () => {
   if (!scene) return;
-  scene.play();
-  // 音频同步
-  if (audio.src) {
-    audio.currentTime = scene.currentTime;
-    audio.play().catch(() => {/* 用户未交互时忽略 */});
+  if (scene.playing) {
+    scene.pause();
+    audio.pause();
+    stopTransportLoop();
+    updateTransport();
+  } else {
+    scene.play();
+    if (audio.src) {
+      audio.currentTime = scene.currentTime;
+      audio.play().catch(() => {/* 用户未交互时忽略 */});
+    }
+    startTransportLoop();
   }
-  startTransportLoop();
-});
-
-pauseBtn.addEventListener('click', () => {
-  if (!scene) return;
-  scene.pause();
-  audio.pause();
-  stopTransportLoop();
-  updateTransport();
 });
 
 seekBar.addEventListener('input', () => {
@@ -341,8 +341,7 @@ function setExportBusy(busy: boolean): void {
   exportMovBtn.disabled = busy;
   exportPngBtn.disabled = busy;
   seekBar.disabled = busy;
-  playBtn.disabled = busy;
-  pauseBtn.disabled = busy;
+  playPauseBtn.disabled = busy;
 }
 
 // ── Export PNG ────────────────────────────────────────────────────────────────

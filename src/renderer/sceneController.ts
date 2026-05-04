@@ -56,6 +56,13 @@ export class SceneController {
     this._buildTimeline();
   }
 
+  private _render = (): void => {
+    renderFrame(this.ctx, this.activeLines, this.cfg, this.transparentBg);
+    if (this.isPlaying) {
+      this.rafId = requestAnimationFrame(this._render);
+    }
+  };
+
   private _buildTimeline(): void {
     this.stop();
     this.activeLines = [];
@@ -98,17 +105,6 @@ export class SceneController {
       buildExit(effects.exit, lineState, masterTl, exitSec, rng);
     }
 
-    const render = () => {
-      renderFrame(this.ctx, this.activeLines, this.cfg, this.transparentBg);
-      if (this.isPlaying) {
-        this.rafId = requestAnimationFrame(render);
-      }
-    };
-
-    masterTl.eventCallback('onStart', () => {
-      this.isPlaying = true;
-      render();
-    });
     masterTl.eventCallback('onComplete', () => {
       this.isPlaying = false;
       cancelAnimationFrame(this.rafId);
@@ -188,7 +184,10 @@ export class SceneController {
   }
 
   play(): void {
+    this.isPlaying = true;
     this.masterTl?.play();
+    cancelAnimationFrame(this.rafId);
+    this.rafId = requestAnimationFrame(this._render);
   }
 
   pause(): void {
@@ -198,7 +197,7 @@ export class SceneController {
   }
 
   seek(timeSec: number): void {
-    this.masterTl?.seek(timeSec, false);
+    this.masterTl?.seek(timeSec, true); // suppressEvents=true，避免触发 onStart/onComplete 污染 isPlaying
     renderFrame(this.ctx, this.activeLines, this.cfg, this.transparentBg);
   }
 
