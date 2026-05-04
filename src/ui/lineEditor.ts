@@ -59,17 +59,14 @@ export class LineEditorUI {
     this._render();
   }
 
-  /** 高亮选中行并滚动到可见区域（直接 DOM 操作，不重建列表） */
+  /** 高亮并展开选中行，滚动到可见区域 */
   setSelected(index: number | null): void {
     const newIdx = index ?? -1;
-    if (this.selectedIndex >= 0) {
-      (this.container.children[this.selectedIndex] as HTMLElement)
-        ?.classList.remove('le-item--selected');
-    }
     this.selectedIndex = newIdx;
+    this.expandedIndex = newIdx;
+    this._render();
     if (this.selectedIndex >= 0) {
       const item = this.container.children[this.selectedIndex] as HTMLElement;
-      item?.classList.add('le-item--selected');
       item?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }

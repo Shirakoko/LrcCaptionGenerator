@@ -114,10 +114,13 @@ export class CanvasDrag {
 
     if (this.hasMoved) {
       const { x, y } = this.scene.lines[this.dragIndex].layout;
+      const params = this.scene.getLineParams(this.dragIndex);
       const existing = this.scene.getOverride(this.dragIndex) ?? {};
       this.scene.setOverride(this.dragIndex, {
         ...existing,
         layout: { ...existing.layout, x: Math.round(x), y: Math.round(y) },
+        // 锁定当前特效，防止 y 被覆盖后 RNG 偏移导致特效随机改变
+        effects: existing.effects ?? (params ? { ...params.effects } : undefined),
       });
       this.lineEditor.refresh();
     }
