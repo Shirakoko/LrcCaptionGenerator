@@ -222,6 +222,37 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
+.lp-text-row {
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.lp-text-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.lp-text-input:focus { border-color: var(--accent); }
+
+.le-color {
+  width: 36px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px;
+  background: var(--input-bg);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 #canvas-wrap {
   flex: 1;
   display: flex;

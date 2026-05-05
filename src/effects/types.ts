@@ -33,6 +33,9 @@ export interface LineState {
   scaleX: number;
   scaleY: number;
   strokeWidth: number;
+  fontFamily?: string;
+  fillColor?: string;
+  strokeColor?: string;
 }
 
 export type EntranceName =
@@ -86,6 +89,7 @@ export interface LayoutOverride {
   align?: Align;
   letterSpacingExtra?: number;
   rotation?: number;
+  fontFamily?: string;
 }
 
 export interface EffectOverride {
@@ -98,8 +102,11 @@ export interface EffectOverride {
 }
 
 export interface LineOverride {
+  text?: string;
   layout?: LayoutOverride;
   effects?: EffectOverride;
+  fillColor?: string;
+  strokeColor?: string;
 }
 
 export type OverrideMap = Record<number, LineOverride>;

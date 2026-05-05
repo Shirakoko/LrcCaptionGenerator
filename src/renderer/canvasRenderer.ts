@@ -62,6 +62,9 @@ export function renderFrame(
 
     const { layout, chars, alpha, scaleX, scaleY } = line;
     const { x, y, fontSize, rotation } = layout;
+    const lineFontFamily = line.fontFamily ?? fontFamily;
+    const lineFillColor  = line.fillColor  ?? fillColor;
+    const lineStrokeColor = line.strokeColor ?? strokeColor;
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -69,7 +72,7 @@ export function renderFrame(
     ctx.rotate(rotation * (Math.PI / 180));
     ctx.scale(scaleX, scaleY);
 
-    ctx.font = `${fontSize}px "${fontFamily}"`;
+    ctx.font = `${fontSize}px "${lineFontFamily}"`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
 
@@ -90,12 +93,12 @@ export function renderFrame(
 
       const sw = strokeWidth + line.strokeWidth;
       if (sw > 0.1) {
-        ctx.strokeStyle = strokeColor;
+        ctx.strokeStyle = lineStrokeColor;
         ctx.lineWidth = sw;
         ctx.lineJoin = 'round';
         ctx.strokeText(c.char, 0, 0);
       }
-      ctx.fillStyle = fillColor;
+      ctx.fillStyle = lineFillColor;
       ctx.fillText(c.char, 0, 0);
 
       ctx.restore();

@@ -19,7 +19,8 @@ export function buildLineState(
   baseOpts: LayoutOptions = {},
   override?: LayoutOverride,
 ): LineState {
-  const { width, height, fontFamily } = cfg;
+  const { width, height, fontFamily: cfgFont } = cfg;
+  const effectiveFontFamily = override?.fontFamily ?? cfgFont;
 
   // Override > baseOpts > random
   const fontSize = override?.fontSize ?? baseOpts.fontSize ?? rng.range(52, 96);
@@ -27,7 +28,7 @@ export function buildLineState(
   const letterSpacingExtra = override?.letterSpacingExtra ?? baseOpts.letterSpacingExtra ?? rng.range(-2, 8);
   const rotation = override?.rotation ?? baseOpts.rotation ?? (rng.bool(0.3) ? rng.range(-4, 4) : 0);
 
-  ctx.font = `${fontSize}px "${fontFamily}"`;
+  ctx.font = `${fontSize}px "${effectiveFontFamily}"`;
 
   const chars = [...text];
   const charWidths = chars.map(ch => ctx.measureText(ch).width + letterSpacingExtra);
@@ -82,5 +83,6 @@ export function buildLineState(
     scaleX: 1,
     scaleY: 1,
     strokeWidth: 0,
+    fontFamily: effectiveFontFamily,
   };
 }

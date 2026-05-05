@@ -5,6 +5,9 @@ import { SceneController } from './renderer/sceneController.ts';
 import './style.css';
 import { LineEditorUI } from './ui/lineEditor.ts';
 import { CanvasDrag } from './ui/canvasDrag.ts';
+import { FONTS, loadFonts } from './fonts.ts';
+
+loadFonts();
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const lrcInput = document.getElementById('lrc-input') as HTMLTextAreaElement;
@@ -59,6 +62,15 @@ const rightPanel = document.getElementById('right-panel') as HTMLElement;
 const rightPanelResize = document.getElementById('right-panel-resize') as HTMLElement;
 const lineEditorList = document.getElementById('line-editor-list') as HTMLDivElement;
 const linePropsPanel = document.getElementById('line-props-panel') as HTMLDivElement;
+const fontSelect = document.getElementById('font-select') as HTMLSelectElement;
+
+// Populate global font selector
+FONTS.forEach(font => {
+  const opt = document.createElement('option');
+  opt.value = font.family;
+  opt.textContent = font.name;
+  fontSelect.appendChild(opt);
+});
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let scene: SceneController | null = null;
@@ -93,6 +105,7 @@ function buildConfig(): RenderConfig {
     fillColor: fillColor.value,
     strokeColor: strokeColor.value,
     strokeWidth: parseFloat(strokeWidthRange.value),
+    fontFamily: fontSelect.value || DEFAULT_CONFIG.fontFamily,
   };
 }
 

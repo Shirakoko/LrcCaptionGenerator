@@ -90,13 +90,15 @@ export class SceneController {
       const override = this.overrideMap[i];
 
       const lineState = buildLineState(
-        lyric.text,
+        override?.text ?? lyric.text,
         this.ctx,
         this.cfg,
         rng,
         baseLayoutOpts,
         override?.layout,
       );
+      lineState.fillColor   = override?.fillColor;
+      lineState.strokeColor = override?.strokeColor;
       this.activeLines.push(lineState);
 
       const startSec = lyric.time / 1000;
@@ -165,6 +167,10 @@ export class SceneController {
 
   getOverride(index: number): LineOverride | undefined {
     return this.overrideMap[index];
+  }
+
+  getConfig(): RenderConfig {
+    return this.cfg;
   }
 
   getLyrics(): LyricLine[] {

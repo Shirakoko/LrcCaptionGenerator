@@ -5,6 +5,7 @@ import {
   ENTRANCE_PARAMS, IDLE_PARAMS, EXIT_PARAMS,
   type ParamDef,
 } from '../effects/paramSchemas.ts';
+import { FONTS } from '../fonts.ts';
 
 function fmtTime(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -99,7 +100,8 @@ export class LineEditorUI {
     this.container.innerHTML = '';
     const lyrics = this.scene.getLyrics();
     lyrics.forEach((lyric, i) => {
-      this.container.appendChild(this._buildItem(i, lyric.time, lyric.text));
+      const effectiveText = this.scene.getOverride(i)?.text ?? lyric.text;
+      this.container.appendChild(this._buildItem(i, lyric.time, effectiveText));
     });
   }
 
@@ -160,6 +162,15 @@ export class LineEditorUI {
     item.classList.toggle('le-item--modified', isModified);
     const dot = item.querySelector('.le-dot');
     if (dot) dot.classList.toggle('le-dot--on', isModified);
+
+    // Also update displayed text if it changed
+    const textEl = item.querySelector<HTMLElement>('.le-text');
+    if (textEl) {
+      const effectiveText = this.scene.getOverride(index)?.text
+        ?? this.scene.getLyrics()[index]?.text ?? '';
+      textEl.textContent = effectiveText;
+      textEl.title = effectiveText;
+    }
   }
 
   private _populateProps(index: number, params: LineParams): void {
@@ -168,20 +179,30 @@ export class LineEditorUI {
 
     const { layout, effects } = params;
     const savedOverride = this.scene.getOverride(index);
-
-    // Title
+    const cfg = this.scene.getConfig();
     const lyrics = this.scene.getLyrics();
     const lyric = lyrics[index];
-    if (lyric) {
-      const titleEl = document.createElement('div');
-      titleEl.className = 'lp-title';
-      titleEl.textContent = lyric.text;
-      titleEl.title = lyric.text;
-      this.propsPanel.appendChild(titleEl);
-    }
 
-    // Layout section
+    // ── Editable text ─────────────────────────────────────────────────────────
+    const textRow = document.createElement('div');
+    textRow.className = 'le-row lp-text-row';
+
+    const textLabel = document.createElement('label');
+    textLabel.className = 'le-label';
+    textLabel.textContent = '文字';
+
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'lp-text-input';
+    textInput.dataset.key = 'lyric-text';
+    textInput.value = savedOverride?.text ?? (lyric?.text ?? '');
+
+    textRow.append(textLabel, textInput);
+    this.propsPanel.appendChild(textRow);
+
+    // ── Layout section ────────────────────────────────────────────────────────
     const layoutSec = this._section('布局', [
+      this._fontRow(savedOverride?.layout?.fontFamily ?? ''),
       this._alignRow(layout.align),
       this._sliderRow('位置 X',  'x',                 layout.x,             0, this.canvasWidth,  1,   'px'),
       this._sliderRow('位置 Y',  'y',                 layout.y,             0, this.canvasHeight, 1,   'px'),
@@ -191,7 +212,14 @@ export class LineEditorUI {
     ]);
     this.propsPanel.appendChild(layoutSec);
 
-    // Effects section
+    // ── Color section ─────────────────────────────────────────────────────────
+    const colorSec = this._section('颜色', [
+      this._colorRow('字色',  'fillColor',   savedOverride?.fillColor   ?? cfg.fillColor),
+      this._colorRow('描边色', 'strokeColor', savedOverride?.strokeColor ?? cfg.strokeColor),
+    ]);
+    this.propsPanel.appendChild(colorSec);
+
+    // ── Effects section ───────────────────────────────────────────────────────
     const fxSec = document.createElement('div');
     fxSec.className = 'le-section';
     const fxTitle = document.createElement('div');
@@ -284,6 +312,57 @@ export class LineEditorUI {
     return container;
   }
 
+  // ── Font row ────────────────────────────────────────────────────────────────
+
+  private _fontRow(currentFamily: string): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'le-row';
+
+    const lbl = document.createElement('label');
+    lbl.className = 'le-label';
+    lbl.textContent = '字体';
+
+    const sel = document.createElement('select');
+    sel.className = 'le-select';
+    sel.dataset.key = 'fontFamily';
+
+    const inheritOpt = document.createElement('option');
+    inheritOpt.value = '';
+    inheritOpt.textContent = '继承全局';
+    sel.appendChild(inheritOpt);
+
+    FONTS.forEach(font => {
+      const opt = document.createElement('option');
+      opt.value = font.family;
+      opt.textContent = font.name;
+      if (font.family === currentFamily) opt.selected = true;
+      sel.appendChild(opt);
+    });
+
+    row.append(lbl, sel);
+    return row;
+  }
+
+  // ── Color row ───────────────────────────────────────────────────────────────
+
+  private _colorRow(label: string, key: string, value: string): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'le-row';
+
+    const lbl = document.createElement('label');
+    lbl.className = 'le-label';
+    lbl.textContent = label;
+
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.className = 'le-color';
+    colorInput.dataset.key = key;
+    colorInput.value = value;
+
+    row.append(lbl, colorInput);
+    return row;
+  }
+
   // ── Generic slider row ──────────────────────────────────────────────────────
 
   private _sliderRow(
@@ -374,6 +453,10 @@ export class LineEditorUI {
       const el = panel.querySelector<HTMLSelectElement>(`select[data-key="${key}"]`);
       return el?.value ?? '';
     };
+    const colorVal = (key: string): string | undefined => {
+      const el = panel.querySelector<HTMLInputElement>(`input[type="color"][data-key="${key}"]`);
+      return el?.value;
+    };
     const activeAlign = (): 'left' | 'center' | 'right' => {
       const btn = panel.querySelector<HTMLButtonElement>('.le-align-btn.active');
       return (btn?.dataset.val ?? 'center') as 'left' | 'center' | 'right';
@@ -388,11 +471,15 @@ export class LineEditorUI {
       return result;
     };
 
+    const textEl = panel.querySelector<HTMLInputElement>('input[data-key="lyric-text"]');
+    const fontFamily = selectVal('fontFamily') || undefined;
+
     const entrance = selectVal('entrance') as EntranceName;
     const idle     = selectVal('idle')     as IdleName;
     const exit     = selectVal('exit')     as ExitName;
 
     return {
+      text: textEl?.value,
       layout: {
         x:                  sliderVal('x'),
         y:                  sliderVal('y'),
@@ -400,6 +487,7 @@ export class LineEditorUI {
         align:              activeAlign(),
         letterSpacingExtra: sliderVal('letterSpacingExtra'),
         rotation:           sliderVal('rotation'),
+        fontFamily,
       },
       effects: {
         entrance,
@@ -409,6 +497,8 @@ export class LineEditorUI {
         exit,
         exitParams:     collectEffectParams('exit'),
       },
+      fillColor:   colorVal('fillColor'),
+      strokeColor: colorVal('strokeColor'),
     };
   }
 
