@@ -91,7 +91,7 @@ export function renderFrame(
         ctx.filter = 'none';
       }
 
-      const sw = strokeWidth + line.strokeWidth;
+      const sw = (line.strokeWidthOverride ?? strokeWidth) + line.strokeWidth;
       if (sw > 0.1) {
         ctx.strokeStyle = lineStrokeColor;
         ctx.lineWidth = sw;

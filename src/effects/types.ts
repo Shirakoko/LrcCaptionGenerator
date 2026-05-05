@@ -33,6 +33,7 @@ export interface LineState {
   scaleX: number;
   scaleY: number;
   strokeWidth: number;
+  strokeWidthOverride?: number;
   fontFamily?: string;
   fillColor?: string;
   strokeColor?: string;
@@ -107,6 +108,7 @@ export interface LineOverride {
   effects?: EffectOverride;
   fillColor?: string;
   strokeColor?: string;
+  strokeWidth?: number;
 }
 
 export type OverrideMap = Record<number, LineOverride>;

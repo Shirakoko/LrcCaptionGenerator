@@ -211,6 +211,11 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
 
 #line-props-panel[hidden] { display: none; }
 
+#line-props-panel .le-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  padding-top: 10px;
+}
+
 .lp-title {
   font-size: 12px;
   font-weight: 700;
@@ -223,8 +228,7 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
 }
 
 .lp-text-row {
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 4px;
 }
 
 .lp-text-input {

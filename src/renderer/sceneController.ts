@@ -97,8 +97,9 @@ export class SceneController {
         baseLayoutOpts,
         override?.layout,
       );
-      lineState.fillColor   = override?.fillColor;
-      lineState.strokeColor = override?.strokeColor;
+      lineState.fillColor          = override?.fillColor;
+      lineState.strokeColor        = override?.strokeColor;
+      lineState.strokeWidthOverride = override?.strokeWidth;
       this.activeLines.push(lineState);
 
       const startSec = lyric.time / 1000;

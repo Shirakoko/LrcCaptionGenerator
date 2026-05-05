@@ -214,8 +214,9 @@ export class LineEditorUI {
 
     // ── Color section ─────────────────────────────────────────────────────────
     const colorSec = this._section('颜色', [
-      this._colorRow('字色',  'fillColor',   savedOverride?.fillColor   ?? cfg.fillColor),
-      this._colorRow('描边色', 'strokeColor', savedOverride?.strokeColor ?? cfg.strokeColor),
+      this._colorRow('字色',    'fillColor',   savedOverride?.fillColor   ?? cfg.fillColor),
+      this._colorRow('描边色',  'strokeColor', savedOverride?.strokeColor ?? cfg.strokeColor),
+      this._sliderRow('描边粗细', 'strokeWidth', savedOverride?.strokeWidth ?? cfg.strokeWidth, 0, 16, 0.5, 'px'),
     ]);
     this.propsPanel.appendChild(colorSec);
 
@@ -453,10 +454,6 @@ export class LineEditorUI {
       const el = panel.querySelector<HTMLSelectElement>(`select[data-key="${key}"]`);
       return el?.value ?? '';
     };
-    const colorVal = (key: string): string | undefined => {
-      const el = panel.querySelector<HTMLInputElement>(`input[type="color"][data-key="${key}"]`);
-      return el?.value;
-    };
     const activeAlign = (): 'left' | 'center' | 'right' => {
       const btn = panel.querySelector<HTMLButtonElement>('.le-align-btn.active');
       return (btn?.dataset.val ?? 'center') as 'left' | 'center' | 'right';
@@ -473,6 +470,10 @@ export class LineEditorUI {
 
     const textEl = panel.querySelector<HTMLInputElement>('input[data-key="lyric-text"]');
     const fontFamily = selectVal('fontFamily') || undefined;
+
+    const fillColorEl   = panel.querySelector<HTMLInputElement>('input[type="color"][data-key="fillColor"]');
+    const strokeColorEl = panel.querySelector<HTMLInputElement>('input[type="color"][data-key="strokeColor"]');
+    const strokeWidthEl = panel.querySelector<HTMLInputElement>('input[type="range"][data-key="strokeWidth"]');
 
     const entrance = selectVal('entrance') as EntranceName;
     const idle     = selectVal('idle')     as IdleName;
@@ -497,8 +498,9 @@ export class LineEditorUI {
         exit,
         exitParams:     collectEffectParams('exit'),
       },
-      fillColor:   colorVal('fillColor'),
-      strokeColor: colorVal('strokeColor'),
+      fillColor:   fillColorEl?.value,
+      strokeColor: strokeColorEl?.value,
+      strokeWidth: strokeWidthEl ? parseFloat(strokeWidthEl.value) : undefined,
     };
   }
 
