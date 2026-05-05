@@ -217,6 +217,11 @@ strokeWidthRange.addEventListener('input', () => {
   strokeWidthVal.textContent = strokeWidthRange.value;
 });
 
+// ── Live background color preview ─────────────────────────────────────────────
+bgColor.addEventListener('input', () => {
+  scene?.updateConfig({ bgColor: bgColor.value });
+});
+
 // ── Build ─────────────────────────────────────────────────────────────────────
 buildBtn.addEventListener('click', () => {
   if (isExporting) {

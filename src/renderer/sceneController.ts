@@ -224,6 +224,11 @@ export class SceneController {
     return this.cfg;
   }
 
+  updateConfig(partial: Partial<RenderConfig>): void {
+    this.cfg = { ...this.cfg, ...partial };
+    renderFrame(this.ctx, this.activeLines, this._activeCfg(), this.transparentBg);
+  }
+
   getLyrics(): LyricLine[] {
     return this.lyrics;
   }
