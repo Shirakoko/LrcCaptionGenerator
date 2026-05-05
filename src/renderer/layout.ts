@@ -84,5 +84,6 @@ export function buildLineState(
     scaleY: 1,
     strokeWidth: 0,
     fontFamily: effectiveFontFamily,
+    pixelFx: [],
   };
 }

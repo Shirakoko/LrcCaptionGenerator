@@ -1,8 +1,9 @@
 import type { SceneController, LineParams } from '../renderer/sceneController.ts';
-import type { EntranceName, IdleName, ExitName, LineOverride } from '../effects/types.ts';
+import type { EntranceName, IdleName, ExitName, LineOverride, PixelFxEntry, PixelFxName } from '../effects/types.ts';
 import { ENTRANCES, IDLES, EXITS } from '../effects/types.ts';
 import {
   ENTRANCE_PARAMS, IDLE_PARAMS, EXIT_PARAMS,
+  PIXEL_FX_ORDER, PIXEL_FX_LABELS, PIXEL_FX_PARAMS, PIXEL_FX_COLOR_PARAMS,
   type ParamDef,
 } from '../effects/paramSchemas.ts';
 import { FONTS } from '../fonts.ts';
@@ -202,8 +203,10 @@ export class LineEditorUI {
 
     // ── Color section ─────────────────────────────────────────────────────────
     const colorSec = this._section('颜色', [
-      this._colorRow('字色',    'fillColor',   savedOverride?.fillColor   ?? cfg.fillColor),
-      this._colorRow('描边色',  'strokeColor', savedOverride?.strokeColor ?? cfg.strokeColor),
+      this._fillStrokeColorRow(
+        savedOverride?.fillColor   ?? cfg.fillColor,
+        savedOverride?.strokeColor ?? cfg.strokeColor,
+      ),
       this._sliderRow('描边粗细', 'strokeWidth', savedOverride?.strokeWidth ?? cfg.strokeWidth, 0, 16, 0.5, 'px'),
     ]);
     this.propsPanel.appendChild(colorSec);
@@ -239,6 +242,10 @@ export class LineEditorUI {
     ));
 
     this.propsPanel.appendChild(fxSec);
+
+    // ── Pixel effects section ─────────────────────────────────────────────────
+    const pixelSec = this._buildPixelFxSection(savedOverride?.pixelFx ?? []);
+    this.propsPanel.appendChild(pixelSec);
   }
 
   // ── Effect group: dropdown + dynamic param sliders ──────────────────────────
@@ -328,9 +335,37 @@ export class LineEditorUI {
     return row;
   }
 
+  private _fillStrokeColorRow(fillVal: string, strokeVal: string): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'le-row';
+
+    const fillLbl = document.createElement('label');
+    fillLbl.className = 'le-label';
+    fillLbl.textContent = '字色';
+
+    const fillInput = document.createElement('input');
+    fillInput.type = 'color';
+    fillInput.className = 'le-color';
+    fillInput.dataset.key = 'fillColor';
+    fillInput.value = fillVal;
+
+    const strokeLbl = document.createElement('label');
+    strokeLbl.className = 'le-label';
+    strokeLbl.textContent = '描边色';
+
+    const strokeInput = document.createElement('input');
+    strokeInput.type = 'color';
+    strokeInput.className = 'le-color';
+    strokeInput.dataset.key = 'strokeColor';
+    strokeInput.value = strokeVal;
+
+    row.append(fillLbl, fillInput, strokeLbl, strokeInput);
+    return row;
+  }
+
   // ── Color row ───────────────────────────────────────────────────────────────
 
-  private _colorRow(label: string, key: string, value: string): HTMLElement {
+  private _colorRow(label: string, key: string, value: string, fxParam?: string): HTMLElement {
     const row = document.createElement('div');
     row.className = 'le-row';
 
@@ -342,6 +377,7 @@ export class LineEditorUI {
     colorInput.type = 'color';
     colorInput.className = 'le-color';
     colorInput.dataset.key = key;
+    if (fxParam) colorInput.dataset.fxParam = fxParam;
     colorInput.value = value;
 
     row.append(lbl, colorInput);
@@ -485,7 +521,98 @@ export class LineEditorUI {
       fillColor:   fillColorEl?.value,
       strokeColor: strokeColorEl?.value,
       strokeWidth: strokeWidthEl ? parseFloat(strokeWidthEl.value) : undefined,
+      pixelFx:     this._collectPixelFx(panel),
     };
+  }
+
+  private _collectPixelFx(panel: HTMLElement): PixelFxEntry[] {
+    const entries: PixelFxEntry[] = [];
+    panel.querySelectorAll<HTMLElement>('[data-pixel-fx]').forEach(rowEl => {
+      const name = rowEl.dataset.pixelFx as PixelFxName;
+      const cb = rowEl.querySelector<HTMLInputElement>('input[type="checkbox"]');
+      const enabled = cb?.checked ?? false;
+
+      const params: Record<string, number | string> = {};
+      // Numeric params are in the sibling paramsDiv (next element after row)
+      const paramsDiv = rowEl.nextElementSibling as HTMLElement | null;
+      if (paramsDiv?.classList.contains('le-pfx-params')) {
+        paramsDiv.querySelectorAll<HTMLInputElement>('input[type="range"][data-fx-param]').forEach(el => {
+          params[el.dataset.fxParam!] = parseFloat(el.value);
+        });
+        paramsDiv.querySelectorAll<HTMLInputElement>('input[type="color"][data-fx-param]').forEach(el => {
+          params[el.dataset.fxParam!] = el.value;
+        });
+      }
+
+      entries.push({ name, params, enabled });
+    });
+    return entries;
+  }
+
+  // ── Pixel effects section ────────────────────────────────────────────────────
+
+  private _buildPixelFxSection(savedFx: PixelFxEntry[]): HTMLElement {
+    const sec = document.createElement('div');
+    sec.className = 'le-section';
+    const title = document.createElement('div');
+    title.className = 'le-section-title';
+    title.textContent = '像素特效';
+    sec.appendChild(title);
+
+    const savedMap = new Map(savedFx.map(e => [e.name, e]));
+
+    for (const fxName of PIXEL_FX_ORDER) {
+      const saved = savedMap.get(fxName);
+      const enabled = saved?.enabled ?? false;
+
+      // Header row: checkbox + label
+      const row = document.createElement('div');
+      row.className = 'le-row le-pfx-row';
+      row.dataset.pixelFx = fxName;
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'le-pfx-cb';
+      cb.checked = enabled;
+
+      const lbl = document.createElement('label');
+      lbl.className = 'le-pfx-label';
+      lbl.textContent = PIXEL_FX_LABELS[fxName as PixelFxName];
+
+      row.append(cb, lbl);
+      sec.appendChild(row);
+
+      // Params area (shown when checked)
+      const paramsDiv = document.createElement('div');
+      paramsDiv.className = 'le-pfx-params';
+      paramsDiv.hidden = !enabled;
+
+      const numDefs = PIXEL_FX_PARAMS[fxName as PixelFxName] ?? [];
+      for (const def of numDefs) {
+        const val = typeof saved?.params[def.key] === 'number'
+          ? saved!.params[def.key] as number
+          : def.default;
+        const paramRow = this._sliderRow(def.label, `pfx-${fxName}-${def.key}`, val, def.min, def.max, def.step, def.unit);
+        // tag sliders so _collectPixelFx can find them
+        paramRow.querySelectorAll('input[type="range"]').forEach(el => {
+          (el as HTMLInputElement).dataset.fxParam = def.key;
+        });
+        paramsDiv.appendChild(paramRow);
+      }
+
+      const colorDefs = PIXEL_FX_COLOR_PARAMS[fxName as PixelFxName] ?? [];
+      for (const cd of colorDefs) {
+        const val = (saved?.params[cd.key] as string) ?? cd.default;
+        paramsDiv.appendChild(this._colorRow(cd.label, `pfx-${fxName}-${cd.key}`, val, cd.key));
+      }
+
+      sec.appendChild(paramsDiv);
+
+      // Toggle visibility on checkbox change (auto-apply fires separately via bubbling)
+      cb.addEventListener('change', () => { paramsDiv.hidden = !cb.checked; });
+    }
+
+    return sec;
   }
 
   // ── Section wrapper ──────────────────────────────────────────────────────────

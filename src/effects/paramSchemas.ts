@@ -1,4 +1,4 @@
-import type { EntranceName, IdleName, ExitName } from './types.ts';
+import type { EntranceName, IdleName, ExitName, PixelFxName } from './types.ts';
 
 export interface ParamDef {
   key: string;
@@ -30,7 +30,44 @@ const slideVParams: ParamDef[] = [
   { key: 'stagger', label: '字符错位', min: 0, max: 0.12, step: 0.01, unit: 's', default: 0.04 },
 ];
 
-// ── Entrance params ───────────────────────────────────────────────────────────
+// ── Pixel effects ─────────────────────────────────────────────────────────────
+
+export const PIXEL_FX_ORDER: PixelFxName[] = [
+  'blur', 'chromaticAberration', 'grain', 'pixelate', 'glow',
+];
+
+export const PIXEL_FX_LABELS: Record<PixelFxName, string> = {
+  blur: '模糊',
+  chromaticAberration: '色散',
+  grain: '噪点',
+  pixelate: '马赛克',
+  glow: '发光',
+};
+
+export const PIXEL_FX_PARAMS: Record<PixelFxName, ParamDef[]> = {
+  blur: [
+    { key: 'radius',    label: '半径', min: 0, max: 20, step: 0.5, unit: 'px', default: 4 },
+  ],
+  chromaticAberration: [
+    { key: 'offset',    label: '强度', min: 0, max: 12, step: 0.5, unit: 'px', default: 4 },
+  ],
+  grain: [
+    { key: 'intensity', label: '强度', min: 0,   max: 1,  step: 0.05, unit: '',   default: 0.3 },
+    { key: 'size',      label: '粒度', min: 1,   max: 4,  step: 1,    unit: 'px', default: 1   },
+  ],
+  pixelate: [
+    { key: 'blockSize', label: '块大小', min: 2, max: 24, step: 1, unit: 'px', default: 8 },
+  ],
+  glow: [
+    { key: 'radius',    label: '半径', min: 0, max: 30, step: 1, unit: 'px', default: 10 },
+  ],
+};
+
+// Color params (non-numeric) for pixel effects
+export const PIXEL_FX_COLOR_PARAMS: Partial<Record<PixelFxName, Array<{ key: string; label: string; default: string }>>> = {
+  glow: [{ key: 'color', label: '颜色', default: '#7c6af7' }],
+};
+
 
 export const ENTRANCE_PARAMS: Record<EntranceName, ParamDef[]> = {
   typewriter: [

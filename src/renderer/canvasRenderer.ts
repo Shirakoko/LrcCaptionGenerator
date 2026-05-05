@@ -1,11 +1,12 @@
 import type { LineState } from '../effects/types.ts';
+import { applyPixelFxToLine } from '../effects/pixelFx.ts';
 
 export interface RenderConfig {
   width: number;
   height: number;
   bgColor: string;
   bgImage: HTMLImageElement | null;
-  bgBrightness: number;  // 0-200, 100 = 原始
+  bgBrightness: number;
   bgContrast: number;
   bgSaturate: number;
   fontFamily: string;
@@ -27,6 +28,55 @@ export const DEFAULT_CONFIG: RenderConfig = {
   strokeColor: '#000000',
   strokeWidth: 0,
 };
+
+// Draw all characters of a single line onto any 2D context.
+function drawLineChars(
+  ctx: CanvasRenderingContext2D,
+  line: LineState,
+  fontFamily: string,
+  fillColor: string,
+  strokeColor: string,
+  strokeWidth: number,
+): void {
+  const { layout, chars, alpha, scaleX, scaleY } = line;
+  const { x, y, fontSize, rotation } = layout;
+  const lineFontFamily  = line.fontFamily  ?? fontFamily;
+  const lineFillColor   = line.fillColor   ?? fillColor;
+  const lineStrokeColor = line.strokeColor ?? strokeColor;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.rotate(rotation * (Math.PI / 180));
+  ctx.scale(scaleX, scaleY);
+  ctx.font = `${fontSize}px "${lineFontFamily}"`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+
+  for (const c of chars) {
+    if (c.alpha <= 0) continue;
+
+    ctx.save();
+    ctx.globalAlpha = alpha * c.alpha;
+    ctx.translate(c.x - x, c.y - y);
+    ctx.rotate(c.rotation * (Math.PI / 180));
+    ctx.scale(c.scaleX, c.scaleY);
+    ctx.filter = c.blur > 0 ? `blur(${c.blur.toFixed(1)}px)` : 'none';
+
+    const sw = (line.strokeWidthOverride ?? strokeWidth) + line.strokeWidth;
+    if (sw > 0.1) {
+      ctx.strokeStyle = lineStrokeColor;
+      ctx.lineWidth = sw;
+      ctx.lineJoin = 'round';
+      ctx.strokeText(c.char, 0, 0);
+    }
+    ctx.fillStyle = lineFillColor;
+    ctx.fillText(c.char, 0, 0);
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
 
 export function renderFrame(
   ctx: CanvasRenderingContext2D,
@@ -60,50 +110,19 @@ export function renderFrame(
   for (const line of lines) {
     if (line.alpha <= 0) continue;
 
-    const { layout, chars, alpha, scaleX, scaleY } = line;
-    const { x, y, fontSize, rotation } = layout;
-    const lineFontFamily = line.fontFamily ?? fontFamily;
-    const lineFillColor  = line.fillColor  ?? fillColor;
-    const lineStrokeColor = line.strokeColor ?? strokeColor;
+    const activePixelFx = line.pixelFx.filter(fx => fx.enabled);
 
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.translate(x, y);
-    ctx.rotate(rotation * (Math.PI / 180));
-    ctx.scale(scaleX, scaleY);
-
-    ctx.font = `${fontSize}px "${lineFontFamily}"`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
-
-    for (const c of chars) {
-      if (c.alpha <= 0) continue;
-
-      ctx.save();
-      ctx.globalAlpha = alpha * c.alpha;
-      ctx.translate(c.x - x, c.y - y);
-      ctx.rotate(c.rotation * (Math.PI / 180));
-      ctx.scale(c.scaleX, c.scaleY);
-
-      if (c.blur > 0) {
-        ctx.filter = `blur(${c.blur.toFixed(1)}px)`;
-      } else {
-        ctx.filter = 'none';
-      }
-
-      const sw = (line.strokeWidthOverride ?? strokeWidth) + line.strokeWidth;
-      if (sw > 0.1) {
-        ctx.strokeStyle = lineStrokeColor;
-        ctx.lineWidth = sw;
-        ctx.lineJoin = 'round';
-        ctx.strokeText(c.char, 0, 0);
-      }
-      ctx.fillStyle = lineFillColor;
-      ctx.fillText(c.char, 0, 0);
-
-      ctx.restore();
+    if (activePixelFx.length === 0) {
+      // Fast path — draw directly to main canvas
+      drawLineChars(ctx, line, fontFamily, fillColor, strokeColor, strokeWidth);
+    } else {
+      // Pixel-effects path — draw to offscreen then composite with effects
+      applyPixelFxToLine(
+        ctx,
+        (offCtx) => drawLineChars(offCtx, line, fontFamily, fillColor, strokeColor, strokeWidth),
+        activePixelFx,
+        width, height,
+      );
     }
-
-    ctx.restore();
   }
 }

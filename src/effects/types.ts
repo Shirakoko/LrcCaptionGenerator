@@ -26,6 +26,21 @@ export interface CharState {
   baseY: number;
 }
 
+// ── Pixel effects ─────────────────────────────────────────────────────────────
+
+export type PixelFxName =
+  | 'blur'
+  | 'chromaticAberration'
+  | 'grain'
+  | 'pixelate'
+  | 'glow';
+
+export interface PixelFxEntry {
+  name: PixelFxName;
+  params: Record<string, number | string>;
+  enabled: boolean;
+}
+
 export interface LineState {
   chars: CharState[];
   layout: LineLayout;
@@ -37,6 +52,7 @@ export interface LineState {
   fontFamily?: string;
   fillColor?: string;
   strokeColor?: string;
+  pixelFx: PixelFxEntry[];
 }
 
 export type EntranceName =
@@ -109,6 +125,7 @@ export interface LineOverride {
   fillColor?: string;
   strokeColor?: string;
   strokeWidth?: number;
+  pixelFx?: PixelFxEntry[];
 }
 
 export type OverrideMap = Record<number, LineOverride>;
