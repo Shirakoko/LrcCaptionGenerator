@@ -58,7 +58,7 @@ const timeDisplay = document.getElementById('time-display') as HTMLSpanElement;
 const rightPanel = document.getElementById('right-panel') as HTMLElement;
 const rightPanelResize = document.getElementById('right-panel-resize') as HTMLElement;
 const lineEditorList = document.getElementById('line-editor-list') as HTMLDivElement;
-const leClearAllBtn = document.getElementById('le-clear-all-btn') as HTMLButtonElement;
+const linePropsPanel = document.getElementById('line-props-panel') as HTMLDivElement;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let scene: SceneController | null = null;
@@ -256,7 +256,7 @@ buildBtn.addEventListener('click', () => {
   if (lineEditor) {
     lineEditor.update(scene, cfg.width, cfg.height);
   } else {
-    lineEditor = new LineEditorUI(lineEditorList, scene, cfg.width, cfg.height, (t) => {
+    lineEditor = new LineEditorUI(lineEditorList, linePropsPanel, scene, cfg.width, cfg.height, (t) => {
       if (audio.src) audio.currentTime = t;
       updateTransport();
     });
@@ -460,13 +460,6 @@ exportMovBtn.addEventListener('click', async () => {
 // ── Export cancel ─────────────────────────────────────────────────────────────
 exportCancelBtn.addEventListener('click', () => {
   exportCancelled = true;
-});
-
-// ── Line editor: clear all overrides ─────────────────────────────────────────
-leClearAllBtn.addEventListener('click', () => {
-  if (!scene) return;
-  scene.clearAllOverrides();
-  lineEditor?.refresh();
 });
 
 // ── Right panel resize ────────────────────────────────────────────────────────

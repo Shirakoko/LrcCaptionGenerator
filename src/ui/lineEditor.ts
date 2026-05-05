@@ -30,47 +30,68 @@ const EXIT_LABELS: Record<ExitName, string> = {
 
 export class LineEditorUI {
   private container: HTMLElement;
+  private propsPanel: HTMLElement;
   private scene: SceneController;
   private canvasWidth: number;
   private canvasHeight: number;
-  private expandedIndex = -1;
   private selectedIndex = -1;
   private onSeek: ((timeSec: number) => void) | undefined;
 
   constructor(
     container: HTMLElement,
+    propsPanel: HTMLElement,
     scene: SceneController,
     canvasWidth: number,
     canvasHeight: number,
     onSeek?: (timeSec: number) => void,
   ) {
     this.container    = container;
+    this.propsPanel   = propsPanel;
     this.scene        = scene;
     this.canvasWidth  = canvasWidth;
     this.canvasHeight = canvasHeight;
     this.onSeek       = onSeek;
+
+    // Wire auto-apply once on the shared panel
+    propsPanel.addEventListener('input', () => this._autoApply());
+    propsPanel.addEventListener('change', () => this._autoApply());
+    propsPanel.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('.le-align-btn')) {
+        this._autoApply();
+      }
+    });
+
     this._render();
   }
 
-  refresh(): void { this._render(); }
+  refresh(): void {
+    this._render();
+    if (this.selectedIndex >= 0) {
+      const params = this.scene.getLineParams(this.selectedIndex);
+      if (params) this._populateProps(this.selectedIndex, params);
+    }
+  }
 
   update(scene: SceneController, canvasWidth: number, canvasHeight: number): void {
     this.scene        = scene;
     this.canvasWidth  = canvasWidth;
     this.canvasHeight = canvasHeight;
-    this.expandedIndex = -1;
     this.selectedIndex = -1;
+    this.propsPanel.hidden = true;
     this._render();
   }
 
   setSelected(index: number | null): void {
     const newIdx = index ?? -1;
     this.selectedIndex = newIdx;
-    this.expandedIndex = newIdx;
     this._render();
     if (this.selectedIndex >= 0) {
       const item = this.container.children[this.selectedIndex] as HTMLElement;
       item?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const params = this.scene.getLineParams(this.selectedIndex);
+      if (params) this._populateProps(this.selectedIndex, params);
+    } else {
+      this.propsPanel.hidden = true;
     }
   }
 
@@ -84,7 +105,6 @@ export class LineEditorUI {
 
   private _buildItem(index: number, timeMs: number, text: string): HTMLElement {
     const isModified = this.scene.hasOverride(index);
-    const isExpanded = this.expandedIndex === index;
     const isSelected = this.selectedIndex === index;
 
     const item = document.createElement('div');
@@ -107,49 +127,71 @@ export class LineEditorUI {
     textEl.textContent = text;
     textEl.title = text;
 
-    const toggleBtn = document.createElement('button');
-    toggleBtn.type = 'button';
-    toggleBtn.className = 'le-toggle-btn';
-    toggleBtn.textContent = isExpanded ? '▲' : '▼';
-
-    header.append(dot, timeEl, textEl, toggleBtn);
+    header.append(dot, timeEl, textEl);
     header.addEventListener('click', () => {
-      this.expandedIndex = this.expandedIndex === index ? -1 : index;
-      this.selectedIndex = index;
+      const wasSelected = this.selectedIndex === index;
+      this.selectedIndex = wasSelected ? -1 : index;
       const timeSec = timeMs / 1000;
       this.scene.seek(timeSec);
       this.onSeek?.(timeSec);
       this._render();
+      if (this.selectedIndex >= 0) {
+        const params = this.scene.getLineParams(this.selectedIndex);
+        if (params) this._populateProps(this.selectedIndex, params);
+      } else {
+        this.propsPanel.hidden = true;
+      }
     });
 
     item.appendChild(header);
-
-    if (isExpanded) {
-      const params = this.scene.getLineParams(index);
-      if (params) item.appendChild(this._buildPanel(index, params));
-    }
-
     return item;
   }
 
-  private _buildPanel(index: number, params: LineParams): HTMLElement {
-    const panel = document.createElement('div');
-    panel.className = 'le-panel';
+  private _autoApply(): void {
+    if (this.selectedIndex < 0) return;
+    this.scene.setOverride(this.selectedIndex, this._collectOverride(this.propsPanel));
+    this._updateListItemState(this.selectedIndex);
+  }
+
+  private _updateListItemState(index: number): void {
+    const item = this.container.children[index] as HTMLElement;
+    if (!item) return;
+    const isModified = this.scene.hasOverride(index);
+    item.classList.toggle('le-item--modified', isModified);
+    const dot = item.querySelector('.le-dot');
+    if (dot) dot.classList.toggle('le-dot--on', isModified);
+  }
+
+  private _populateProps(index: number, params: LineParams): void {
+    this.propsPanel.innerHTML = '';
+    this.propsPanel.hidden = false;
 
     const { layout, effects } = params;
     const savedOverride = this.scene.getOverride(index);
 
-    // ── 布局 section ──────────────────────────────────────────────────────────
+    // Title
+    const lyrics = this.scene.getLyrics();
+    const lyric = lyrics[index];
+    if (lyric) {
+      const titleEl = document.createElement('div');
+      titleEl.className = 'lp-title';
+      titleEl.textContent = lyric.text;
+      titleEl.title = lyric.text;
+      this.propsPanel.appendChild(titleEl);
+    }
+
+    // Layout section
     const layoutSec = this._section('布局', [
       this._alignRow(layout.align),
-      this._sliderRow('位置 X',  'x',                  layout.x,             0, this.canvasWidth,  1,   'px'),
-      this._sliderRow('位置 Y',  'y',                  layout.y,             0, this.canvasHeight, 1,   'px'),
-      this._sliderRow('字号',    'fontSize',            layout.fontSize,      24, 200,              1,   'px'),
-      this._sliderRow('字间距',  'letterSpacingExtra',  layout.letterSpacing, -4, 16,               0.5, 'px'),
-      this._sliderRow('旋转',    'rotation',            layout.rotation,     -20, 20,               0.5, '°'),
+      this._sliderRow('位置 X',  'x',                 layout.x,             0, this.canvasWidth,  1,   'px'),
+      this._sliderRow('位置 Y',  'y',                 layout.y,             0, this.canvasHeight, 1,   'px'),
+      this._sliderRow('字号',    'fontSize',           layout.fontSize,      24, 200,              1,   'px'),
+      this._sliderRow('字间距',  'letterSpacingExtra', layout.letterSpacing, -4, 16,               0.5, 'px'),
+      this._sliderRow('旋转',    'rotation',           layout.rotation,     -20, 20,               0.5, '°'),
     ]);
+    this.propsPanel.appendChild(layoutSec);
 
-    // ── 特效 section ──────────────────────────────────────────────────────────
+    // Effects section
     const fxSec = document.createElement('div');
     fxSec.className = 'le-section';
     const fxTitle = document.createElement('div');
@@ -179,36 +221,7 @@ export class LineEditorUI {
       savedOverride?.effects?.exitParams,
     ));
 
-    // ── Actions ───────────────────────────────────────────────────────────────
-    const actions = document.createElement('div');
-    actions.className = 'le-actions';
-
-    const applyBtn = document.createElement('button');
-    applyBtn.type = 'button';
-    applyBtn.className = 'le-apply-btn';
-    applyBtn.textContent = '应用并预览';
-
-    const resetBtn = document.createElement('button');
-    resetBtn.type = 'button';
-    resetBtn.className = 'le-reset-btn';
-    resetBtn.textContent = '还原随机值';
-    resetBtn.disabled = !this.scene.hasOverride(index);
-
-    applyBtn.addEventListener('click', () => {
-      this.scene.setOverride(index, this._collectOverride(panel));
-      this.expandedIndex = index;
-      this._render();
-    });
-
-    resetBtn.addEventListener('click', () => {
-      this.scene.clearOverride(index);
-      this.expandedIndex = index;
-      this._render();
-    });
-
-    actions.append(applyBtn, resetBtn);
-    panel.append(layoutSec, fxSec, actions);
-    return panel;
+    this.propsPanel.appendChild(fxSec);
   }
 
   // ── Effect group: dropdown + dynamic param sliders ──────────────────────────
@@ -225,7 +238,6 @@ export class LineEditorUI {
     const container = document.createElement('div');
     container.className = 'le-effect-group';
 
-    // Dropdown row
     const selectRow = document.createElement('div');
     selectRow.className = 'le-row';
 
@@ -247,7 +259,6 @@ export class LineEditorUI {
     selectRow.append(lbl, sel);
     container.appendChild(selectRow);
 
-    // Params container (rebuilt when dropdown changes)
     const paramsDiv = document.createElement('div');
     paramsDiv.className = 'le-effect-params';
     paramsDiv.dataset.paramsFor = category;
@@ -267,7 +278,7 @@ export class LineEditorUI {
 
     renderParams(currentEffect, savedParams);
 
-    // When effect changes, show default params for the new effect
+    // Re-render params with defaults when effect changes; auto-apply fires via bubbled change event
     sel.addEventListener('change', () => renderParams(sel.value));
 
     return container;
