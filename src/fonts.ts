@@ -5,8 +5,8 @@ export interface FontDef {
 }
 
 export const FONTS: FontDef[] = [
-  { name: 'Noto Sans SC', family: 'Noto Sans SC' },
-  { name: '系统无衬线', family: 'system-ui' },
+  { name: '思源黑体', family: 'Noto Sans SC' },
+  { name: '无衬线', family: 'system-ui' },
   { name: '等宽', family: 'monospace' },
   // 添加自定义字体：将字体文件放入 public/fonts/，然后在此追加一条：
   // { name: '显示名称', family: 'CSS字族名', url: '/fonts/文件名.ttf' },
