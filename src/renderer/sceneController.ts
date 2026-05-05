@@ -22,6 +22,13 @@ export interface SceneOptions {
   overrides?: OverrideMap;
 }
 
+export type MediaResolver = (timeSec: number) => {
+  element: HTMLImageElement;
+  brightness: number;
+  contrast: number;
+  saturate: number;
+} | null;
+
 export class SceneController {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -31,6 +38,7 @@ export class SceneController {
   private rafId = 0;
   private isPlaying = false;
   transparentBg = false;
+  private mediaResolver: MediaResolver | null = null;
 
   // Stored state for rebuilding
   private lyrics: LyricLine[] = [];
@@ -59,8 +67,26 @@ export class SceneController {
     this._buildTimeline();
   }
 
+  setMediaResolver(fn: MediaResolver | null): void {
+    this.mediaResolver = fn;
+  }
+
+  private _activeCfg(timeSec?: number): RenderConfig {
+    if (!this.mediaResolver) return this.cfg;
+    const t = timeSec ?? this.currentTime;
+    const m = this.mediaResolver(t);
+    if (!m) return { ...this.cfg, bgImage: null };
+    return {
+      ...this.cfg,
+      bgImage: m.element,
+      bgBrightness: m.brightness,
+      bgContrast: m.contrast,
+      bgSaturate: m.saturate,
+    };
+  }
+
   private _render = (): void => {
-    renderFrame(this.ctx, this.activeLines, this.cfg, this.transparentBg);
+    renderFrame(this.ctx, this.activeLines, this._activeCfg(), this.transparentBg);
     if (this.isPlaying) {
       this.rafId = requestAnimationFrame(this._render);
     }
@@ -230,7 +256,7 @@ export class SceneController {
       c.x += dx; c.y += dy;
       c.baseX += dx; c.baseY += dy;
     }
-    renderFrame(this.ctx, this.activeLines, this.cfg, this.transparentBg);
+    renderFrame(this.ctx, this.activeLines, this._activeCfg(), this.transparentBg);
   }
 
   play(): void {
@@ -247,8 +273,8 @@ export class SceneController {
   }
 
   seek(timeSec: number): void {
-    this.masterTl?.seek(timeSec, true); // suppressEvents=true，避免触发 onStart/onComplete 污染 isPlaying
-    renderFrame(this.ctx, this.activeLines, this.cfg, this.transparentBg);
+    this.masterTl?.seek(timeSec, true);
+    renderFrame(this.ctx, this.activeLines, this._activeCfg(timeSec), this.transparentBg);
   }
 
   stop(): void {

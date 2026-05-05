@@ -5,100 +5,80 @@ import { SceneController } from './renderer/sceneController.ts';
 import './style.css';
 import { LineEditorUI } from './ui/lineEditor.ts';
 import { CanvasDrag } from './ui/canvasDrag.ts';
+import { TimelineController } from './ui/timeline.ts';
 import { FONTS, loadFonts } from './fonts.ts';
 
 loadFonts();
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const lrcInput = document.getElementById('lrc-input') as HTMLTextAreaElement;
-const lrcUploadBtn = document.getElementById('lrc-upload-btn') as HTMLButtonElement;
-const lrcFile = document.getElementById('lrc-file') as HTMLInputElement;
-const randomEnable = document.getElementById('random-enable') as HTMLInputElement;
-const seedRow = document.getElementById('seed-row') as HTMLDivElement;
-const seedInput = document.getElementById('seed-input') as HTMLInputElement;
-const reseedBtn = document.getElementById('reseed-btn') as HTMLButtonElement;
+const lrcInput        = document.getElementById('lrc-input')         as HTMLTextAreaElement;
+const lrcUploadBtn    = document.getElementById('lrc-upload-btn')    as HTMLButtonElement;
+const lrcFile         = document.getElementById('lrc-file')          as HTMLInputElement;
+const randomEnable    = document.getElementById('random-enable')     as HTMLInputElement;
+const seedRow         = document.getElementById('seed-row')          as HTMLDivElement;
+const seedInput       = document.getElementById('seed-input')        as HTMLInputElement;
+const reseedBtn       = document.getElementById('reseed-btn')        as HTMLButtonElement;
 const resolutionSelect = document.getElementById('resolution-select') as HTMLSelectElement;
-const bgColor = document.getElementById('bg-color') as HTMLInputElement;
-const fillColor = document.getElementById('fill-color') as HTMLInputElement;
-const strokeWidthRange = document.getElementById('stroke-width') as HTMLInputElement;
-const strokeWidthVal = document.getElementById('stroke-width-val') as HTMLSpanElement;
-const strokeColor = document.getElementById('stroke-color') as HTMLInputElement;
-const bgImgUploadBtn = document.getElementById('bg-img-upload-btn') as HTMLButtonElement;
-const bgImgClearBtn = document.getElementById('bg-img-clear-btn') as HTMLButtonElement;
-const bgImgFile = document.getElementById('bg-img-file') as HTMLInputElement;
-const bgImgPreviewWrap = document.getElementById('bg-img-preview-wrap') as HTMLDivElement;
-const bgImgPreview = document.getElementById('bg-img-preview') as HTMLImageElement;
-const bgTabColor = document.getElementById('bg-tab-color') as HTMLButtonElement;
-const bgTabImage = document.getElementById('bg-tab-image') as HTMLButtonElement;
-const bgPanelColor = document.getElementById('bg-panel-color') as HTMLDivElement;
-const bgPanelImage = document.getElementById('bg-panel-image') as HTMLDivElement;
-const bgBrightnessInput = document.getElementById('bg-brightness') as HTMLInputElement;
-const bgBrightnessVal = document.getElementById('bg-brightness-val') as HTMLSpanElement;
-const bgContrastInput = document.getElementById('bg-contrast') as HTMLInputElement;
-const bgContrastVal = document.getElementById('bg-contrast-val') as HTMLSpanElement;
-const bgSaturateInput = document.getElementById('bg-saturate') as HTMLInputElement;
-const bgSaturateVal = document.getElementById('bg-saturate-val') as HTMLSpanElement;
-const bgAdjustReset = document.getElementById('bg-adjust-reset') as HTMLButtonElement;
-const audioUploadBtn = document.getElementById('audio-upload-btn') as HTMLButtonElement;
-const audioClearBtn = document.getElementById('audio-clear-btn') as HTMLButtonElement;
-const audioFileInput = document.getElementById('audio-file') as HTMLInputElement;
-const audioInfo = document.getElementById('audio-info') as HTMLDivElement;
-const audioName = document.getElementById('audio-name') as HTMLSpanElement;
-const buildBtn = document.getElementById('build-btn') as HTMLButtonElement;
-const exportPngBtn = document.getElementById('export-png-btn') as HTMLButtonElement;
-const exportWebmBtn = document.getElementById('export-webm-btn') as HTMLButtonElement;
-const exportMovBtn = document.getElementById('export-mov-btn') as HTMLButtonElement;
+const bgColor         = document.getElementById('bg-color')          as HTMLInputElement;
+const fillColor       = document.getElementById('fill-color')        as HTMLInputElement;
+const strokeWidthRange = document.getElementById('stroke-width')     as HTMLInputElement;
+const strokeWidthVal  = document.getElementById('stroke-width-val')  as HTMLSpanElement;
+const strokeColor     = document.getElementById('stroke-color')      as HTMLInputElement;
+const buildBtn        = document.getElementById('build-btn')         as HTMLButtonElement;
+const exportPngBtn    = document.getElementById('export-png-btn')    as HTMLButtonElement;
+const exportWebmBtn   = document.getElementById('export-webm-btn')   as HTMLButtonElement;
+const exportMovBtn    = document.getElementById('export-mov-btn')    as HTMLButtonElement;
 const exportTransparent = document.getElementById('export-transparent') as HTMLInputElement;
-const exportProgress = document.getElementById('export-progress') as HTMLDivElement;
-const exportBar = document.getElementById('export-bar') as HTMLProgressElement;
-const exportLabel = document.getElementById('export-label') as HTMLSpanElement;
+const exportProgress  = document.getElementById('export-progress')   as HTMLDivElement;
+const exportBar       = document.getElementById('export-bar')        as HTMLProgressElement;
+const exportLabel     = document.getElementById('export-label')      as HTMLSpanElement;
 const exportCancelBtn = document.getElementById('export-cancel-btn') as HTMLButtonElement;
-const exportMovNote = document.getElementById('export-mov-note') as HTMLDivElement;
-const mainCanvas = document.getElementById('main-canvas') as HTMLCanvasElement;
-const playPauseBtn = document.getElementById('play-pause-btn') as HTMLButtonElement;
-const seekBar = document.getElementById('seek-bar') as HTMLInputElement;
-const timeDisplay = document.getElementById('time-display') as HTMLSpanElement;
-const rightPanel = document.getElementById('right-panel') as HTMLElement;
+const exportMovNote   = document.getElementById('export-mov-note')   as HTMLDivElement;
+const mainCanvas      = document.getElementById('main-canvas')       as HTMLCanvasElement;
+const playPauseBtn    = document.getElementById('play-pause-btn')    as HTMLButtonElement;
+const seekBar         = document.getElementById('seek-bar')          as HTMLInputElement;
+const timeDisplay     = document.getElementById('time-display')      as HTMLSpanElement;
+const rightPanel      = document.getElementById('right-panel')       as HTMLElement;
 const rightPanelResize = document.getElementById('right-panel-resize') as HTMLElement;
-const lineEditorList = document.getElementById('line-editor-list') as HTMLDivElement;
-const linePropsPanel = document.getElementById('line-props-panel') as HTMLDivElement;
-const fontSelect = document.getElementById('font-select') as HTMLSelectElement;
+const lineEditorList  = document.getElementById('line-editor-list')  as HTMLDivElement;
+const linePropsPanel  = document.getElementById('line-props-panel')  as HTMLDivElement;
+const fontSelect      = document.getElementById('font-select')       as HTMLSelectElement;
 const globalStylePanel = document.getElementById('global-style-panel') as HTMLDivElement;
-const gspFont = document.getElementById('gsp-font') as HTMLSelectElement;
-const gspFillColor = document.getElementById('gsp-fill-color') as HTMLInputElement;
-const gspStrokeColor = document.getElementById('gsp-stroke-color') as HTMLInputElement;
-const gspStrokeWidth = document.getElementById('gsp-stroke-width') as HTMLInputElement;
+const gspFont         = document.getElementById('gsp-font')          as HTMLSelectElement;
+const gspFillColor    = document.getElementById('gsp-fill-color')    as HTMLInputElement;
+const gspStrokeColor  = document.getElementById('gsp-stroke-color') as HTMLInputElement;
+const gspStrokeWidth  = document.getElementById('gsp-stroke-width') as HTMLInputElement;
 const gspStrokeWidthNum = document.getElementById('gsp-stroke-width-num') as HTMLInputElement;
-const gspApplyBtn = document.getElementById('gsp-apply-btn') as HTMLButtonElement;
-const gspAlignGroup = document.getElementById('gsp-align-group') as HTMLDivElement;
+const gspApplyBtn     = document.getElementById('gsp-apply-btn')     as HTMLButtonElement;
+const gspAlignGroup   = document.getElementById('gsp-align-group')   as HTMLDivElement;
+// Timeline
+const timelineEl      = document.getElementById('timeline')          as HTMLDivElement;
+const tlMediaAdd      = document.getElementById('tl-media-add')      as HTMLButtonElement;
+const tlAudioAdd      = document.getElementById('tl-audio-add')      as HTMLButtonElement;
+const tlMediaFile     = document.getElementById('tl-media-file')     as HTMLInputElement;
+const tlAudioFile     = document.getElementById('tl-audio-file')     as HTMLInputElement;
 
-// Populate global font selector
+// ── Font selectors ────────────────────────────────────────────────────────────
 FONTS.forEach(font => {
-  const opt = document.createElement('option');
-  opt.value = font.family;
-  opt.textContent = font.name;
-  opt.style.fontFamily = font.family;
-  fontSelect.appendChild(opt);
+  const makeOpt = () => {
+    const opt = document.createElement('option');
+    opt.value = font.family;
+    opt.textContent = font.name;
+    opt.style.fontFamily = font.family;
+    return opt;
+  };
+  fontSelect.appendChild(makeOpt());
+  gspFont.appendChild(makeOpt());
 });
 
-// Populate global style panel font selector
-FONTS.forEach(font => {
-  const opt = document.createElement('option');
-  opt.value = font.family;
-  opt.textContent = font.name;
-  opt.style.fontFamily = font.family;
-  gspFont.appendChild(opt);
-});
-
-// Wire global style panel alignment buttons
-gspAlignGroup.addEventListener('click', (e) => {
+// ── Global style panel ────────────────────────────────────────────────────────
+gspAlignGroup.addEventListener('click', e => {
   const btn = (e.target as HTMLElement).closest('.le-align-btn') as HTMLButtonElement | null;
   if (!btn) return;
   gspAlignGroup.querySelectorAll('.le-align-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 });
 
-// Sync global style panel stroke slider ↔ number input
 gspStrokeWidth.addEventListener('input', () => { gspStrokeWidthNum.value = gspStrokeWidth.value; });
 gspStrokeWidthNum.addEventListener('input', () => {
   const v = Math.max(0, Math.min(16, parseFloat(gspStrokeWidthNum.value) || 0));
@@ -110,13 +90,55 @@ let scene: SceneController | null = null;
 let lineEditor: LineEditorUI | null = null;
 let canvasDrag: CanvasDrag | null = null;
 let seekRafId = 0;
-let bgImage: HTMLImageElement | null = null;
-let bgMode: 'color' | 'image' = 'color';
-let audioBlobUrl: string | null = null;
 let isExporting = false;
 let exportCancelled = false;
-const audio = new Audio();
-audio.preload = 'auto';
+
+// ── Timeline ──────────────────────────────────────────────────────────────────
+const timeline = new TimelineController(timelineEl);
+
+timeline.onSeek(t => {
+  if (!scene) return;
+  scene.seek(t);
+  timeline.seekAudio(t);
+  timeline.syncPlayhead(t);
+  updateTransport();
+});
+
+timeline.onCaptionClick((lineIdx, timeSec) => {
+  if (!scene) return;
+  scene.seek(timeSec);
+  timeline.seekAudio(timeSec);
+  timeline.syncPlayhead(timeSec);
+  lineEditor?.setSelected(lineIdx);
+  updateTransport();
+});
+
+timeline.onChange(() => {
+  // When timeline clips change, update the scene's total duration ref via seek bar
+  updateTransport();
+});
+
+// Media file input
+tlMediaAdd.addEventListener('click', () => tlMediaFile.click());
+tlMediaFile.addEventListener('change', async () => {
+  if (!tlMediaFile.files?.length) return;
+  await timeline.addMediaFiles(tlMediaFile.files);
+  tlMediaFile.value = '';
+});
+
+// Audio file input
+tlAudioAdd.addEventListener('click', () => tlAudioFile.click());
+tlAudioFile.addEventListener('change', async () => {
+  if (!tlAudioFile.files?.length) return;
+  await timeline.addAudioFiles(tlAudioFile.files);
+  tlAudioFile.value = '';
+});
+
+// Drag-drop setup
+timeline.setupDragDrop(
+  async files => { await timeline.addMediaFiles(files); },
+  async files => { await timeline.addAudioFiles(files); },
+);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getResolution(): { width: number; height: number } {
@@ -131,10 +153,6 @@ function buildConfig(): RenderConfig {
     width,
     height,
     bgColor: bgColor.value,
-    bgImage: bgMode === 'image' ? bgImage : null,
-    bgBrightness: parseInt(bgBrightnessInput.value, 10),
-    bgContrast: parseInt(bgContrastInput.value, 10),
-    bgSaturate: parseInt(bgSaturateInput.value, 10),
     fillColor: fillColor.value,
     strokeColor: strokeColor.value,
     strokeWidth: parseFloat(strokeWidthRange.value),
@@ -147,23 +165,23 @@ function getSeed(): string | number {
   return v === '' ? Date.now() : v;
 }
 
-function fmt(sec: number): string {
-  return sec.toFixed(1);
-}
+function fmt(sec: number): string { return sec.toFixed(1); }
 
 function updateTransport(): void {
   if (!scene) return;
   const cur = scene.currentTime;
-  const dur = scene.duration;
+  const dur = Math.max(scene.duration, timeline.totalDuration);
   timeDisplay.textContent = `${fmt(cur)} / ${fmt(dur)} s`;
   seekBar.value = dur > 0 ? String((cur / dur) * 100) : '0';
   playPauseBtn.textContent = scene.playing ? '⏸ 暂停' : '▶ 播放';
+  timeline.syncPlayhead(cur, scene.playing);
 }
 
 function startTransportLoop(): void {
   playPauseBtn.textContent = '⏸ 暂停';
   const loop = () => {
     updateTransport();
+    timeline.syncAudio(scene!.currentTime, true);
     seekRafId = requestAnimationFrame(loop);
   };
   seekRafId = requestAnimationFrame(loop);
@@ -180,16 +198,12 @@ lrcFile.addEventListener('change', () => {
   const file = lrcFile.files?.[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (e) => {
-    lrcInput.value = e.target?.result as string ?? '';
-  };
+  reader.onload = e => { lrcInput.value = e.target?.result as string ?? ''; };
   reader.readAsText(file, 'utf-8');
 });
 
 // ── Random enable toggle ──────────────────────────────────────────────────────
-function syncSeedRowVisibility(): void {
-  seedRow.hidden = !randomEnable.checked;
-}
+function syncSeedRowVisibility(): void { seedRow.hidden = !randomEnable.checked; }
 randomEnable.addEventListener('change', syncSeedRowVisibility);
 syncSeedRowVisibility();
 
@@ -201,76 +215,6 @@ reseedBtn.addEventListener('click', () => {
 // ── Stroke width display ──────────────────────────────────────────────────────
 strokeWidthRange.addEventListener('input', () => {
   strokeWidthVal.textContent = strokeWidthRange.value;
-});
-
-// ── Background tab switch ─────────────────────────────────────────────────────
-function switchBgTab(mode: 'color' | 'image'): void {
-  bgMode = mode;
-  bgTabColor.classList.toggle('active', mode === 'color');
-  bgTabImage.classList.toggle('active', mode === 'image');
-  bgPanelColor.hidden = mode !== 'color';
-  bgPanelImage.hidden = mode !== 'image';
-}
-
-bgTabColor.addEventListener('click', () => switchBgTab('color'));
-bgTabImage.addEventListener('click', () => switchBgTab('image'));
-
-// ── Background image ──────────────────────────────────────────────────────────
-bgImgUploadBtn.addEventListener('click', () => bgImgFile.click());
-
-bgImgFile.addEventListener('change', () => {
-  const file = bgImgFile.files?.[0];
-  if (!file) return;
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.onload = () => {
-    bgImage = img;
-    bgImgPreview.src = url;
-    bgImgPreviewWrap.hidden = false;
-  };
-  img.src = url;
-});
-
-bgImgClearBtn.addEventListener('click', () => {
-  bgImage = null;
-  bgImgPreview.src = '';
-  bgImgPreviewWrap.hidden = true;
-  bgImgFile.value = '';
-});
-
-// ── Background image adjustments ──────────────────────────────────────────────
-function syncSlider(input: HTMLInputElement, label: HTMLSpanElement): void {
-  input.addEventListener('input', () => { label.textContent = `${input.value}%`; });
-}
-syncSlider(bgBrightnessInput, bgBrightnessVal);
-syncSlider(bgContrastInput, bgContrastVal);
-syncSlider(bgSaturateInput, bgSaturateVal);
-
-bgAdjustReset.addEventListener('click', () => {
-  bgBrightnessInput.value = '100'; bgBrightnessVal.textContent = '100%';
-  bgContrastInput.value = '100';   bgContrastVal.textContent = '100%';
-  bgSaturateInput.value = '100';   bgSaturateVal.textContent = '100%';
-});
-
-// ── Audio ─────────────────────────────────────────────────────────────────────
-audioUploadBtn.addEventListener('click', () => audioFileInput.click());
-
-audioFileInput.addEventListener('change', () => {
-  const file = audioFileInput.files?.[0];
-  if (!file) return;
-  if (audioBlobUrl) URL.revokeObjectURL(audioBlobUrl);
-  audioBlobUrl = URL.createObjectURL(file);
-  audio.src = audioBlobUrl;
-  audioName.textContent = file.name;
-  audioInfo.hidden = false;
-});
-
-audioClearBtn.addEventListener('click', () => {
-  audio.pause();
-  audio.src = '';
-  if (audioBlobUrl) { URL.revokeObjectURL(audioBlobUrl); audioBlobUrl = null; }
-  audioInfo.hidden = true;
-  audioFileInput.value = '';
 });
 
 // ── Build ─────────────────────────────────────────────────────────────────────
@@ -288,27 +232,39 @@ buildBtn.addEventListener('click', () => {
   if (lyrics.length === 0) { alert('未能解析到任何歌词行，请检查 LRC 格式'); return; }
 
   const cfg = buildConfig();
-
-  // 保留已有的手动编辑，跨 build 传递给新 scene
   const prevOverrides = scene?.getOverrideMap() ?? {};
   scene?.stop();
   scene = new SceneController(mainCanvas, cfg);
+
+  // Wire timeline media resolver
+  scene.setMediaResolver(t => {
+    const clip = timeline.getMediaAtTime(t);
+    if (!clip) return null;
+    return { element: clip.element, brightness: clip.brightness, contrast: clip.contrast, saturate: clip.saturate };
+  });
+
   scene.build(lyrics, { seed: getSeed(), randomLayout: true, staticMode: !randomEnable.checked, overrides: prevOverrides });
   scene.seek(0);
+
+  // Populate caption track
+  timeline.setCaptionLyrics(lyrics);
+  timeline.syncPlayhead(0);
+
   updateTransport();
 
-  // 显示并（重）初始化行编辑器
+  // Line editor
   rightPanel.hidden = false;
   if (lineEditor) {
     lineEditor.update(scene, cfg.width, cfg.height);
   } else {
-    lineEditor = new LineEditorUI(lineEditorList, linePropsPanel, scene, cfg.width, cfg.height, (t) => {
-      if (audio.src) audio.currentTime = t;
+    lineEditor = new LineEditorUI(lineEditorList, linePropsPanel, scene, cfg.width, cfg.height, t => {
+      timeline.seekAudio(t);
+      timeline.syncPlayhead(t);
       updateTransport();
     });
   }
 
-  // 显示全局样式面板并同步当前全局配置值
+  // Global style panel
   globalStylePanel.hidden = false;
   gspFillColor.value = fillColor.value;
   gspStrokeColor.value = strokeColor.value;
@@ -316,10 +272,8 @@ buildBtn.addEventListener('click', () => {
   gspStrokeWidthNum.value = strokeWidthRange.value;
   gspFont.value = fontSelect.value;
 
-  // 初始化 / 更新 canvas 拖拽
-  if (!canvasDrag) {
-    canvasDrag = new CanvasDrag(mainCanvas);
-  }
+  // Canvas drag
+  if (!canvasDrag) canvasDrag = new CanvasDrag(mainCanvas);
   canvasDrag.update(scene, lineEditor);
 });
 
@@ -328,15 +282,12 @@ playPauseBtn.addEventListener('click', () => {
   if (!scene) return;
   if (scene.playing) {
     scene.pause();
-    audio.pause();
+    timeline.stopAllAudio();
     stopTransportLoop();
     updateTransport();
   } else {
     scene.play();
-    if (audio.src) {
-      audio.currentTime = scene.currentTime;
-      audio.play().catch(() => {/* 用户未交互时忽略 */});
-    }
+    timeline.syncAudio(scene.currentTime, true);
     startTransportLoop();
   }
 });
@@ -344,22 +295,16 @@ playPauseBtn.addEventListener('click', () => {
 seekBar.addEventListener('input', () => {
   if (!scene) return;
   const pct = parseFloat(seekBar.value) / 100;
-  const t = pct * scene.duration;
+  const dur = Math.max(scene.duration, timeline.totalDuration);
+  const t = pct * dur;
   scene.seek(t);
-  if (audio.src) audio.currentTime = t;
+  timeline.seekAudio(t);
+  timeline.syncPlayhead(t);
   updateTransport();
 });
 
-// 音频自然结束时同步暂停动画
-audio.addEventListener('ended', () => {
-  scene?.pause();
-  stopTransportLoop();
-});
-
 // ── Export helpers ────────────────────────────────────────────────────────────
-function isTransparent(): boolean {
-  return exportTransparent.checked;
-}
+function isTransparent(): boolean { return exportTransparent.checked; }
 
 async function renderToWebmBlob(fps: number): Promise<Blob> {
   const dur = scene!.duration;
@@ -373,10 +318,9 @@ async function renderToWebmBlob(fps: number): Promise<Blob> {
   const chunks: Blob[] = [];
   const stream = mainCanvas.captureStream(fps);
   const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
-  recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-  const done = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  const done = new Promise<void>(resolve => { recorder.onstop = () => resolve(); });
 
-  // 导出时切换到透明模式
   const prevTransparent = scene!.transparentBg;
   scene!.transparentBg = isTransparent();
 
@@ -385,7 +329,7 @@ async function renderToWebmBlob(fps: number): Promise<Blob> {
     if (exportCancelled) break;
     const t = Math.min(i * frameInterval, dur);
     scene!.seek(t);
-    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+    await new Promise<void>(r => requestAnimationFrame(() => r()));
     const pct = Math.round((i / totalFrames) * 100);
     exportBar.value = pct;
     exportLabel.textContent = `${pct}%`;
@@ -394,8 +338,7 @@ async function renderToWebmBlob(fps: number): Promise<Blob> {
   await done;
 
   scene!.transparentBg = prevTransparent;
-  scene!.seek(scene!.currentTime); // 恢复预览画面
-
+  scene!.seek(scene!.currentTime);
   return new Blob(chunks, { type: mimeType });
 }
 
@@ -445,7 +388,7 @@ exportWebmBtn.addEventListener('click', async () => {
   }
 });
 
-// ── Export MOV (ProRes 4444 via ffmpeg.wasm) ──────────────────────────────────
+// ── Export MOV ────────────────────────────────────────────────────────────────
 exportMovBtn.addEventListener('click', async () => {
   if (!scene) { alert('请先生成预览'); return; }
   if (scene.duration <= 0) { alert('时长为 0，无法导出'); return; }
@@ -455,7 +398,6 @@ exportMovBtn.addEventListener('click', async () => {
   exportLabel.textContent = '加载 ffmpeg…';
 
   try {
-    // 懒加载 ffmpeg.wasm
     const { FFmpeg } = await import('@ffmpeg/ffmpeg');
     const { fetchFile, toBlobURL } = await import('@ffmpeg/util');
 
@@ -469,7 +411,6 @@ exportMovBtn.addEventListener('click', async () => {
     exportMovNote.hidden = true;
     exportLabel.textContent = '渲染帧…';
 
-    // 先渲染成 WebM
     const webmBlob = await renderToWebmBlob(30);
     if (exportCancelled) return;
     const webmData = await fetchFile(webmBlob);
@@ -478,7 +419,6 @@ exportMovBtn.addEventListener('click', async () => {
     exportLabel.textContent = '转换 MOV…';
     exportBar.value = 99;
 
-    // 转换为 ProRes 4444（保留 Alpha）
     await ffmpeg.exec([
       '-i', 'input.webm',
       '-c:v', 'prores_ks',
@@ -489,7 +429,6 @@ exportMovBtn.addEventListener('click', async () => {
     ]);
 
     const movData = await ffmpeg.readFile('output.mov');
-    // FileData 可能是 Uint8Array<SharedArrayBuffer>，需要复制到普通 ArrayBuffer
     const movBytes = movData instanceof Uint8Array
       ? movData.buffer.slice(0) as ArrayBuffer
       : (movData as unknown as ArrayBuffer);
@@ -512,9 +451,7 @@ exportMovBtn.addEventListener('click', async () => {
 });
 
 // ── Export cancel ─────────────────────────────────────────────────────────────
-exportCancelBtn.addEventListener('click', () => {
-  exportCancelled = true;
-});
+exportCancelBtn.addEventListener('click', () => { exportCancelled = true; });
 
 // ── Global style apply ────────────────────────────────────────────────────────
 gspApplyBtn.addEventListener('click', () => {
@@ -532,7 +469,7 @@ gspApplyBtn.addEventListener('click', () => {
 });
 
 // ── Right panel resize ────────────────────────────────────────────────────────
-rightPanelResize.addEventListener('mousedown', (e) => {
+rightPanelResize.addEventListener('mousedown', e => {
   const startX = e.clientX;
   const startWidth = rightPanel.offsetWidth;
 
@@ -541,7 +478,7 @@ rightPanelResize.addEventListener('mousedown', (e) => {
   document.body.style.userSelect = 'none';
 
   const onMove = (ev: MouseEvent) => {
-    const dx = startX - ev.clientX;           // 向左拖 → 面板变宽
+    const dx = startX - ev.clientX;
     const newWidth = Math.max(300, Math.min(600, startWidth + dx));
     rightPanel.style.width = `${newWidth}px`;
   };

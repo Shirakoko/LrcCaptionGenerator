@@ -17,7 +17,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 #app {
   display: flex;
+  flex-direction: column;
   height: 100vh;
+  overflow: hidden;
+}
+
+#main-row {
+  display: flex;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -695,3 +703,259 @@ progress { width: 100%; height: 6px; border-radius: 3px; }
 .le-item--selected .le-header:hover {
   background: #1a3a38;
 }
+
+/* ===== Timeline ===== */
+
+#timeline {
+  height: 200px;
+  min-height: 200px;
+  flex-shrink: 0;
+  display: flex;
+  border-top: 2px solid var(--border);
+  background: var(--panel-bg);
+  overflow: hidden;
+}
+
+#tl-labels {
+  width: 56px;
+  min-width: 56px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: #141414;
+  flex-shrink: 0;
+}
+
+.tl-ruler-space {
+  height: 24px;
+  min-height: 24px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tl-track-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-bottom: 1px solid var(--border);
+  padding: 4px 2px;
+}
+
+.tl-track-label:last-child { border-bottom: none; }
+
+.tl-track-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tl-add-btn {
+  padding: 1px 6px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 3px;
+  color: var(--text-dim);
+  border-color: var(--border);
+  line-height: 1.2;
+}
+
+.tl-add-btn:hover {
+  color: var(--text);
+  border-color: #666;
+  background: #2e2e2e;
+}
+
+#tl-content-area {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+}
+
+#tl-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  min-width: 400px;
+}
+
+#tl-ruler {
+  height: 24px;
+  min-height: 24px;
+  flex-shrink: 0;
+  position: relative;
+  background: #0d0d0d;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.tl-track-row {
+  flex: 1;
+  position: relative;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.tl-track-row:last-of-type { border-bottom: none; }
+
+.tl-track-content {
+  height: 100%;
+  position: relative;
+}
+
+/* ── Time ruler ticks ── */
+.tl-tick {
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  width: 1px;
+  background: #333;
+}
+
+.tl-tick--major {
+  top: 0;
+  background: #555;
+}
+
+.tl-tick--major span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Clips ── */
+.tl-clip {
+  position: absolute;
+  top: 3px;
+  height: calc(100% - 6px);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  min-width: 8px;
+}
+
+.tl-clip:hover { filter: brightness(1.12); }
+
+.tl-clip--media {
+  background: #1e3358;
+  border-color: #3567a8;
+}
+
+.tl-clip--caption {
+  background: rgba(124, 106, 247, 0.28);
+  border-color: rgba(124, 106, 247, 0.55);
+}
+
+.tl-clip--caption:hover {
+  background: rgba(124, 106, 247, 0.42);
+}
+
+.tl-clip--audio {
+  background: #1a3828;
+  border-color: #2a7048;
+}
+
+.tl-clip-thumb {
+  width: 40px;
+  height: calc(100% - 2px);
+  object-fit: cover;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.tl-clip-name {
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.tl-clip-text {
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tl-clip-dur {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-clip-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.tl-clip-resize:hover { background: rgba(255, 255, 255, 0.28); }
+
+.tl-clip-close {
+  flex-shrink: 0;
+  padding: 1px 4px;
+  font-size: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  color: var(--text-dim);
+}
+
+.tl-clip-close:hover { background: #c0392b; color: #fff; border-color: transparent; }
+
+/* ── Drag-drop highlight ── */
+.tl-drop-active {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  background: rgba(124, 106, 247, 0.08) !important;
+}
+
+/* ── Playhead ── */
+#tl-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: #e74c3c;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#tl-playhead-handle {
+  position: absolute;
+  top: 0;
+  left: -5px;
+  width: 10px;
+  height: 12px;
+  background: #e74c3c;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  cursor: ew-resize;
+  pointer-events: all;
+}
+
