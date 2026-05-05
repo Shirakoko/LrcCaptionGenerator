@@ -63,13 +63,46 @@ const rightPanelResize = document.getElementById('right-panel-resize') as HTMLEl
 const lineEditorList = document.getElementById('line-editor-list') as HTMLDivElement;
 const linePropsPanel = document.getElementById('line-props-panel') as HTMLDivElement;
 const fontSelect = document.getElementById('font-select') as HTMLSelectElement;
+const globalStylePanel = document.getElementById('global-style-panel') as HTMLDivElement;
+const gspFont = document.getElementById('gsp-font') as HTMLSelectElement;
+const gspFillColor = document.getElementById('gsp-fill-color') as HTMLInputElement;
+const gspStrokeColor = document.getElementById('gsp-stroke-color') as HTMLInputElement;
+const gspStrokeWidth = document.getElementById('gsp-stroke-width') as HTMLInputElement;
+const gspStrokeWidthNum = document.getElementById('gsp-stroke-width-num') as HTMLInputElement;
+const gspApplyBtn = document.getElementById('gsp-apply-btn') as HTMLButtonElement;
+const gspAlignGroup = document.getElementById('gsp-align-group') as HTMLDivElement;
 
 // Populate global font selector
 FONTS.forEach(font => {
   const opt = document.createElement('option');
   opt.value = font.family;
   opt.textContent = font.name;
+  opt.style.fontFamily = font.family;
   fontSelect.appendChild(opt);
+});
+
+// Populate global style panel font selector
+FONTS.forEach(font => {
+  const opt = document.createElement('option');
+  opt.value = font.family;
+  opt.textContent = font.name;
+  opt.style.fontFamily = font.family;
+  gspFont.appendChild(opt);
+});
+
+// Wire global style panel alignment buttons
+gspAlignGroup.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest('.le-align-btn') as HTMLButtonElement | null;
+  if (!btn) return;
+  gspAlignGroup.querySelectorAll('.le-align-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+});
+
+// Sync global style panel stroke slider ↔ number input
+gspStrokeWidth.addEventListener('input', () => { gspStrokeWidthNum.value = gspStrokeWidth.value; });
+gspStrokeWidthNum.addEventListener('input', () => {
+  const v = Math.max(0, Math.min(16, parseFloat(gspStrokeWidthNum.value) || 0));
+  gspStrokeWidth.value = String(v);
 });
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -275,6 +308,14 @@ buildBtn.addEventListener('click', () => {
     });
   }
 
+  // 显示全局样式面板并同步当前全局配置值
+  globalStylePanel.hidden = false;
+  gspFillColor.value = fillColor.value;
+  gspStrokeColor.value = strokeColor.value;
+  gspStrokeWidth.value = strokeWidthRange.value;
+  gspStrokeWidthNum.value = strokeWidthRange.value;
+  gspFont.value = fontSelect.value;
+
   // 初始化 / 更新 canvas 拖拽
   if (!canvasDrag) {
     canvasDrag = new CanvasDrag(mainCanvas);
@@ -473,6 +514,21 @@ exportMovBtn.addEventListener('click', async () => {
 // ── Export cancel ─────────────────────────────────────────────────────────────
 exportCancelBtn.addEventListener('click', () => {
   exportCancelled = true;
+});
+
+// ── Global style apply ────────────────────────────────────────────────────────
+gspApplyBtn.addEventListener('click', () => {
+  if (!scene) return;
+  const activeAlignBtn = gspAlignGroup.querySelector<HTMLButtonElement>('.le-align-btn.active');
+  const align = (activeAlignBtn?.dataset.val ?? 'center') as 'left' | 'center' | 'right';
+  scene.applyStyleToAll({
+    fontFamily: gspFont.value,
+    align,
+    fillColor: gspFillColor.value,
+    strokeColor: gspStrokeColor.value,
+    strokeWidth: parseFloat(gspStrokeWidth.value),
+  });
+  lineEditor?.refresh();
 });
 
 // ── Right panel resize ────────────────────────────────────────────────────────

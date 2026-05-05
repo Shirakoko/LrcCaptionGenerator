@@ -106,19 +106,13 @@ export class LineEditorUI {
   }
 
   private _buildItem(index: number, timeMs: number, text: string): HTMLElement {
-    const isModified = this.scene.hasOverride(index);
     const isSelected = this.selectedIndex === index;
 
     const item = document.createElement('div');
-    item.className = 'le-item'
-      + (isModified ? ' le-item--modified' : '')
-      + (isSelected ? ' le-item--selected' : '');
+    item.className = 'le-item' + (isSelected ? ' le-item--selected' : '');
 
     const header = document.createElement('div');
     header.className = 'le-header';
-
-    const dot = document.createElement('span');
-    dot.className = 'le-dot' + (isModified ? ' le-dot--on' : '');
 
     const timeEl = document.createElement('span');
     timeEl.className = 'le-time';
@@ -129,7 +123,7 @@ export class LineEditorUI {
     textEl.textContent = text;
     textEl.title = text;
 
-    header.append(dot, timeEl, textEl);
+    header.append(timeEl, textEl);
     header.addEventListener('click', () => {
       const wasSelected = this.selectedIndex === index;
       this.selectedIndex = wasSelected ? -1 : index;
@@ -158,12 +152,6 @@ export class LineEditorUI {
   private _updateListItemState(index: number): void {
     const item = this.container.children[index] as HTMLElement;
     if (!item) return;
-    const isModified = this.scene.hasOverride(index);
-    item.classList.toggle('le-item--modified', isModified);
-    const dot = item.querySelector('.le-dot');
-    if (dot) dot.classList.toggle('le-dot--on', isModified);
-
-    // Also update displayed text if it changed
     const textEl = item.querySelector<HTMLElement>('.le-text');
     if (textEl) {
       const effectiveText = this.scene.getOverride(index)?.text
@@ -202,7 +190,7 @@ export class LineEditorUI {
 
     // ── Layout section ────────────────────────────────────────────────────────
     const layoutSec = this._section('布局', [
-      this._fontRow(savedOverride?.layout?.fontFamily ?? ''),
+      this._fontRow(savedOverride?.layout?.fontFamily ?? cfg.fontFamily),
       this._alignRow(layout.align),
       this._sliderRow('位置 X',  'x',                 layout.x,             0, this.canvasWidth,  1,   'px'),
       this._sliderRow('位置 Y',  'y',                 layout.y,             0, this.canvasHeight, 1,   'px'),
@@ -327,15 +315,11 @@ export class LineEditorUI {
     sel.className = 'le-select';
     sel.dataset.key = 'fontFamily';
 
-    const inheritOpt = document.createElement('option');
-    inheritOpt.value = '';
-    inheritOpt.textContent = '继承全局';
-    sel.appendChild(inheritOpt);
-
     FONTS.forEach(font => {
       const opt = document.createElement('option');
       opt.value = font.family;
       opt.textContent = font.name;
+      opt.style.fontFamily = font.family;
       if (font.family === currentFamily) opt.selected = true;
       sel.appendChild(opt);
     });

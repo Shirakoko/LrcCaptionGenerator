@@ -133,6 +133,29 @@ export class SceneController {
     });
   }
 
+  /** 将指定样式应用到所有字幕行（保留各行已有的位置/特效覆盖） */
+  applyStyleToAll(style: {
+    fontFamily: string;
+    align?: 'left' | 'center' | 'right';
+    fillColor: string;
+    strokeColor: string;
+    strokeWidth: number;
+  }): void {
+    const prevTime = this.currentTime;
+    for (let i = 0; i < this.lyrics.length; i++) {
+      const existing = this.overrideMap[i] ?? {};
+      this.overrideMap[i] = {
+        ...existing,
+        layout: { ...existing.layout, fontFamily: style.fontFamily, align: style.align },
+        fillColor: style.fillColor,
+        strokeColor: style.strokeColor,
+        strokeWidth: style.strokeWidth,
+      };
+    }
+    this._buildTimeline();
+    this.seek(prevTime);
+  }
+
   /** 为指定行设置覆盖参数并立即重建时间轴 */
   setOverride(index: number, override: LineOverride): void {
     const prevTime = this.currentTime;

@@ -154,6 +154,37 @@
       <!-- 右侧预览区 -->
       <main id="preview-area">
         <div id="line-props-panel" hidden></div>
+
+        <!-- 全局样式面板 -->
+        <div id="global-style-panel" hidden>
+          <div class="gsp-title">全局样式</div>
+          <div class="le-row">
+            <label class="le-label">字体</label>
+            <select id="gsp-font" class="le-select"></select>
+          </div>
+          <div class="le-row">
+            <label class="le-label">对齐</label>
+            <div class="le-align-group" id="gsp-align-group">
+              <button type="button" class="le-align-btn" data-val="left">左</button>
+              <button type="button" class="le-align-btn active" data-val="center">中</button>
+              <button type="button" class="le-align-btn" data-val="right">右</button>
+            </div>
+          </div>
+          <div class="le-row">
+            <label class="le-label">字色</label>
+            <input id="gsp-fill-color" type="color" class="le-color" value="#ffffff" />
+            <label class="le-label" style="margin-left:4px;">描边色</label>
+            <input id="gsp-stroke-color" type="color" class="le-color" value="#000000" />
+          </div>
+          <div class="le-row">
+            <label class="le-label">描边粗细</label>
+            <input id="gsp-stroke-width" type="range" class="le-slider" min="0" max="16" step="0.5" value="0" />
+            <input id="gsp-stroke-width-num" type="number" class="le-num" min="0" max="16" step="0.5" value="0" />
+            <span class="le-unit">px</span>
+          </div>
+          <button id="gsp-apply-btn" type="button" class="primary" style="margin-top:2px;">应用于所有字幕</button>
+        </div>
+
         <div id="canvas-wrap">
           <canvas id="main-canvas"></canvas>
         </div>
