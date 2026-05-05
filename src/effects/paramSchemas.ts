@@ -128,6 +128,10 @@ export const IDLE_PARAMS: Record<IdleName, ParamDef[]> = {
     { key: 'scale',  label: '缩放量', min: 1.01, max: 1.15, step: 0.01, unit: 'x', default: 1.04 },
     { key: 'period', label: '周期',   min: 0.5,  max: 5,    step: 0.5,  unit: 's', default: 2    },
   ],
+  altFloat: [
+    { key: 'amplitude', label: '浮动幅度', min: 2, max: 30, step: 1,   unit: 'px', default: 8   },
+    { key: 'period',    label: '周期',     min: 1, max: 6,  step: 0.5, unit: 's',  default: 2   },
+  ],
   none: [],
 };
 

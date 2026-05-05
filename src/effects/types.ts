@@ -73,6 +73,7 @@ export type IdleName =
   | 'float'
   | 'charJitter'
   | 'breathe'
+  | 'altFloat'
   | 'none';
 
 export type ExitName =
@@ -94,7 +95,7 @@ export const ENTRANCES: EntranceName[] = [
   'typewriter', 'slideLeft', 'slideRight', 'slideUp', 'slideDown',
   'scalePop', 'scatter', 'flipX', 'blurFade', 'wave', 'fadeIn', 'glitch',
 ];
-export const IDLES: IdleName[] = ['float', 'charJitter', 'breathe', 'none'];
+export const IDLES: IdleName[] = ['float', 'charJitter', 'breathe', 'altFloat', 'none'];
 export const EXITS: ExitName[] = ['fadeOut', 'floatUp', 'floatDown', 'explode', 'shrink', 'afterimage', 'blurOut'];
 
 // ── Override types ────────────────────────────────────────────────────────────

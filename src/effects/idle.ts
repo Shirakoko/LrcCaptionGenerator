@@ -59,6 +59,23 @@ export function buildIdleTween(
       break;
     }
 
+    case 'altFloat': {
+      const amp    = params.amplitude ?? 8;
+      const period = params.period    ?? 2;
+      for (let i = 0; i < n; i++) {
+        const c   = chars[i];
+        const dir = i % 2 === 0 ? -1 : 1; // even index → up, odd index → down
+        tl.to(c, {
+          y: c.baseY + dir * amp,
+          duration: period / 2,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: Math.ceil(duration / period),
+        }, at);
+      }
+      break;
+    }
+
     case 'breathe': {
       const scale  = params.scale  ?? 1.04;
       const period = params.period ?? 2;

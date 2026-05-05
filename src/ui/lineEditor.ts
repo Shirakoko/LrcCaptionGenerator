@@ -23,7 +23,7 @@ const ENTRANCE_LABELS: Record<EntranceName, string> = {
   fadeIn: '淡入', glitch: '故障闪烁',
 };
 const IDLE_LABELS: Record<IdleName, string> = {
-  float: '浮动', charJitter: '字符抖动', breathe: '呼吸', none: '无',
+  float: '浮动', charJitter: '字符抖动', breathe: '呼吸', altFloat: '交错浮动', none: '无',
 };
 const EXIT_LABELS: Record<ExitName, string> = {
   fadeOut: '淡出', floatUp: '上飘', floatDown: '下落',
