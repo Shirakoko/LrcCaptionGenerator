@@ -260,16 +260,27 @@ buildBtn.addEventListener('click', () => {
   const raw = lrcInput.value.trim();
   if (!raw) { alert('请先输入或上传 LRC 歌词'); return; }
 
-  // Use existing timeline captions (may have been user-edited) when available,
-  // otherwise parse fresh from the LRC text.
-  let lyrics = timeline.hasCaptionData()
+  // If a previous build exists, ask whether to overwrite edits or keep them.
+  let resetEdits = false;
+  if (timeline.hasCaptionData()) {
+    const ok = confirm(
+      '已有编辑中的字幕数据。\n\n' +
+      '点击「确定」将重新解析 LRC，覆盖时间轴和属性编辑。\n' +
+      '点击「取消」保留现有编辑，仅重新生成特效随机值。'
+    );
+    resetEdits = ok;
+  }
+
+  // Parse lyrics: fresh from LRC when overwriting, otherwise keep timeline data.
+  let lyrics = (!resetEdits && timeline.hasCaptionData())
     ? timeline.getCaptionAsLyrics()
     : parseLrc(raw);
 
   if (lyrics.length === 0) { alert('未能解析到任何歌词行，请检查 LRC 格式'); return; }
 
   const cfg = buildConfig();
-  const prevOverrides = scene?.getOverrideMap() ?? {};
+  // Carry over property overrides only when not resetting edits.
+  const prevOverrides = resetEdits ? {} : (scene?.getOverrideMap() ?? {});
   scene?.stop();
   scene = new SceneController(mainCanvas, cfg);
 
@@ -305,8 +316,8 @@ buildBtn.addEventListener('click', () => {
   scene.build(lyrics, { seed: getSeed(), randomLayout: true, staticMode: !randomEnable.checked, overrides: prevOverrides });
   scene.seek(0);
 
-  // Populate caption track (only on first build or after clear; preserve user edits)
-  if (!timeline.hasCaptionData()) {
+  // Populate caption track: always write when resetting, only on first build otherwise.
+  if (resetEdits || !timeline.hasCaptionData()) {
     timeline.setCaptionLyrics(lyrics);
   }
   timeline.syncPlayhead(0);
