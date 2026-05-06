@@ -38,6 +38,12 @@ export const TRANSITION_DEFS: Record<string, TransitionDef> = {
       { key: 'duration', label: '时长', min: 0.1, max: 2.0, step: 0.1, default: 0.5, unit: 's' },
     ],
   },
+  white_fade: {
+    label: '白幕过渡',
+    params: [
+      { key: 'duration', label: '时长', min: 0.1, max: 2.0, step: 0.1, default: 0.5, unit: 's' },
+    ],
+  },
 };
 
 export interface MediaTransition {

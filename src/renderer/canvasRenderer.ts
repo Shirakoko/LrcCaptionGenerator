@@ -162,6 +162,19 @@ function _drawTransitionBg(
         _drawBgImage(ctx, cfg.bgImage2, width, height, b2, c2, s2, (progress - 0.5) * 2);
       }
     }
+  } else if (cfg.bgTransitionType === 'white_fade') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    if (progress < 0.5) {
+      if (cfg.bgImage) {
+        _drawBgImage(ctx, cfg.bgImage, width, height,
+          cfg.bgBrightness, cfg.bgContrast, cfg.bgSaturate, 1 - progress * 2);
+      }
+    } else {
+      if (cfg.bgImage2) {
+        _drawBgImage(ctx, cfg.bgImage2, width, height, b2, c2, s2, (progress - 0.5) * 2);
+      }
+    }
   } else {
     // dissolve: draw A fully, then B at alpha=progress on top
     if (cfg.bgImage) {
