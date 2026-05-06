@@ -33,7 +33,7 @@ export type TransitionResolver = (timeSec: number) => {
   fromClip: { element: HTMLImageElement; brightness: number; contrast: number; saturate: number };
   toClip:   { element: HTMLImageElement; brightness: number; contrast: number; saturate: number };
   progress: number;
-  type: 'dissolve' | 'black_fade';
+  type: string;
 } | null;
 
 export class SceneController {

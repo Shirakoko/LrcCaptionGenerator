@@ -14,7 +14,7 @@ export interface RenderConfig {
   strokeColor: string;
   strokeWidth: number;
   // Transition blending (optional)
-  bgTransitionType?: 'dissolve' | 'black_fade';
+  bgTransitionType?: string;
   bgBlend?: number;              // 0–1 progress into the transition
   bgImage2?: HTMLImageElement | null;
   bgImage2Brightness?: number;

@@ -2,9 +2,48 @@ import type { LyricLine } from '../parser/lrcParser.ts';
 
 // ── Data models ───────────────────────────────────────────────────────────────
 
+export type TransitionType = string;
+
+export interface TransitionParamDef {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  default: number;
+  unit?: string;
+}
+
+export interface TransitionDef {
+  label: string;
+  // 'duration' key is special: it maps to MediaTransition.duration and gets clamped
+  params: TransitionParamDef[];
+}
+
+// Registry of all transition effects. Add new entries here to extend.
+export const TRANSITION_DEFS: Record<string, TransitionDef> = {
+  none: {
+    label: '无',
+    params: [],
+  },
+  dissolve: {
+    label: '混合淡化',
+    params: [
+      { key: 'duration', label: '时长', min: 0.1, max: 2.0, step: 0.1, default: 0.5, unit: 's' },
+    ],
+  },
+  black_fade: {
+    label: '黑幕过渡',
+    params: [
+      { key: 'duration', label: '时长', min: 0.1, max: 2.0, step: 0.1, default: 0.5, unit: 's' },
+    ],
+  },
+};
+
 export interface MediaTransition {
-  type: 'none' | 'dissolve' | 'black_fade';
+  type: TransitionType;
   duration: number; // seconds, default 0.5
+  params?: Record<string, number>; // extra effect-specific params
 }
 
 export interface MediaClip {
@@ -149,7 +188,7 @@ export class TimelineController {
     fromClip: MediaClip;
     toClip: MediaClip;
     progress: number;
-    type: 'dissolve' | 'black_fade';
+    type: string;
   } | null {
     for (let i = 1; i < this.mediaClips.length; i++) {
       const prev = this.mediaClips[i - 1];
@@ -506,12 +545,8 @@ export class TimelineController {
     btn.className = 'tl-transition-btn' + (hasTransition ? ' tl-transition-btn--active' : '');
     btn.style.left = x + 'px';
 
-    const typeLabel: Record<string, string> = {
-      dissolve: '混合淡化',
-      black_fade: '黑幕过渡',
-      none: '无（硬切）',
-    };
-    btn.title = typeLabel[trans?.type ?? 'none'];
+    const type = trans?.type ?? 'none';
+    btn.title = TRANSITION_DEFS[type]?.label ?? type;
     btn.textContent = '⊕';
 
     btn.addEventListener('click', e => {
@@ -527,36 +562,23 @@ export class TimelineController {
 
     const el = document.createElement('div');
     el.className = 'tl-transition-popover';
+
+    // Build select options from registry
+    const options = Object.entries(TRANSITION_DEFS)
+      .map(([k, d]) => `<option value="${k}">${d.label}</option>`)
+      .join('');
+
     el.innerHTML = `
-      <div class="tl-trans-title">选择转场效果</div>
-      <label class="tl-trans-opt"><input type="radio" name="tl-trans-type" value="none" checked> 无（硬切）</label>
-      <label class="tl-trans-opt"><input type="radio" name="tl-trans-type" value="dissolve"> 混合淡化</label>
-      <label class="tl-trans-opt"><input type="radio" name="tl-trans-type" value="black_fade"> 黑幕过渡</label>
-      <div class="tl-trans-dur">
-        <span>时长：</span>
-        <input class="tl-trans-dur-input" type="number" min="0.1" max="2.0" step="0.1" value="0.5">
-        <span>s</span>
-      </div>
+      <div class="tl-trans-title">转场效果</div>
+      <select class="tl-trans-select">${options}</select>
+      <div class="tl-trans-params"></div>
       <div class="tl-trans-warn" hidden>时长已自动限制</div>
     `;
 
-    const durRow = el.querySelector<HTMLElement>('.tl-trans-dur')!;
-    const warnEl = el.querySelector<HTMLElement>('.tl-trans-warn')!;
-
-    el.querySelectorAll<HTMLInputElement>('[name="tl-trans-type"]').forEach(radio => {
-      radio.addEventListener('change', () => {
-        if (radio.checked) {
-          const hasDur = radio.value !== 'none';
-          durRow.hidden = !hasDur;
-          if (!hasDur) warnEl.hidden = true;
-          this._applyTransType(radio.value as 'none' | 'dissolve' | 'black_fade');
-        }
-      });
-    });
-
-    el.querySelector<HTMLInputElement>('.tl-trans-dur-input')!.addEventListener('change', ev => {
-      const val = parseFloat((ev.target as HTMLInputElement).value) || 0.5;
-      this._applyTransDur(val);
+    el.querySelector<HTMLSelectElement>('.tl-trans-select')!.addEventListener('change', ev => {
+      const type = (ev.target as HTMLSelectElement).value;
+      this._applyTransType(type);
+      this._renderTransParams(el, type);
     });
 
     // Close on outside click
@@ -572,6 +594,44 @@ export class TimelineController {
     return el;
   }
 
+  private _renderTransParams(popover: HTMLElement, type: string): void {
+    const paramsEl = popover.querySelector<HTMLElement>('.tl-trans-params')!;
+    const warnEl = popover.querySelector<HTMLElement>('.tl-trans-warn')!;
+    const def = TRANSITION_DEFS[type];
+    paramsEl.innerHTML = '';
+    warnEl.hidden = true;
+
+    if (!def || def.params.length === 0) return;
+
+    const clip = this.mediaClips.find(c => c.id === this.transPopoverClipId);
+
+    for (const p of def.params) {
+      const currentVal = p.key === 'duration'
+        ? (clip?.transitionIn?.duration ?? p.default)
+        : (clip?.transitionIn?.params?.[p.key] ?? p.default);
+
+      const row = document.createElement('div');
+      row.className = 'tl-trans-param-row';
+      row.innerHTML = `
+        <span class="tl-trans-param-label">${p.label}${p.unit ? '（' + p.unit + '）' : ''}：</span>
+        <input class="tl-trans-dur-input" type="number"
+          min="${p.min}" max="${p.max}" step="${p.step}" value="${currentVal}"
+          data-param-key="${p.key}">
+      `;
+
+      row.querySelector<HTMLInputElement>('input')!.addEventListener('change', ev => {
+        const val = parseFloat((ev.target as HTMLInputElement).value) || p.default;
+        if (p.key === 'duration') {
+          this._applyTransDur(val);
+        } else {
+          this._applyTransParam(p.key, val);
+        }
+      });
+
+      paramsEl.appendChild(row);
+    }
+  }
+
   private _showTransPopover(anchorEl: HTMLElement, toIdx: number): void {
     const popover = this._ensureTransPopover();
     const clip = this.mediaClips[toIdx];
@@ -579,34 +639,32 @@ export class TimelineController {
     this.transPopoverClipId = clip.id;
 
     const type = clip.transitionIn?.type ?? 'none';
-    const dur = clip.transitionIn?.duration ?? 0.5;
-
-    popover.querySelectorAll<HTMLInputElement>('[name="tl-trans-type"]').forEach(r => {
-      r.checked = r.value === type;
-    });
-    const durInput = popover.querySelector<HTMLInputElement>('.tl-trans-dur-input')!;
-    durInput.value = String(dur);
-    const hasDur = type !== 'none';
-    popover.querySelector<HTMLElement>('.tl-trans-dur')!.hidden = !hasDur;
+    popover.querySelector<HTMLSelectElement>('.tl-trans-select')!.value = type;
     popover.querySelector<HTMLElement>('.tl-trans-warn')!.hidden = true;
+    this._renderTransParams(popover, type);
 
     const rect = anchorEl.getBoundingClientRect();
     popover.style.display = 'block';
-    // Position below the button, clamped to viewport
-    const popW = 180;
+    const popW = 200;
     const left = Math.min(Math.max(0, rect.left - popW / 2 + rect.width / 2), window.innerWidth - popW);
     popover.style.left = left + 'px';
     popover.style.top = (rect.bottom + 6) + 'px';
   }
 
-  private _applyTransType(type: 'none' | 'dissolve' | 'black_fade'): void {
+  private _applyTransType(type: string): void {
     const clip = this.mediaClips.find(c => c.id === this.transPopoverClipId);
     if (!clip) return;
 
     if (type === 'none') {
       clip.transitionIn = undefined;
     } else {
-      clip.transitionIn = { type, duration: clip.transitionIn?.duration ?? 0.5 };
+      const def = TRANSITION_DEFS[type];
+      const defaultDur = def?.params.find(p => p.key === 'duration')?.default ?? 0.5;
+      clip.transitionIn = {
+        type,
+        duration: clip.transitionIn?.duration ?? defaultDur,
+        params: clip.transitionIn?.params ?? {},
+      };
     }
 
     this._renderMediaTrack();
@@ -629,10 +687,17 @@ export class TimelineController {
     if (warnEl) warnEl.hidden = clamped >= dur;
 
     clip.transitionIn.duration = clamped;
-    // Update input to reflect clamped value
-    const durInput = this.transPopoverEl?.querySelector<HTMLInputElement>('.tl-trans-dur-input');
+    const durInput = this.transPopoverEl?.querySelector<HTMLInputElement>(`[data-param-key="duration"]`);
     if (durInput) durInput.value = String(clamped);
 
+    this._notify();
+  }
+
+  private _applyTransParam(key: string, val: number): void {
+    const clip = this.mediaClips.find(c => c.id === this.transPopoverClipId);
+    if (!clip || !clip.transitionIn) return;
+    if (!clip.transitionIn.params) clip.transitionIn.params = {};
+    clip.transitionIn.params[key] = val;
     this._notify();
   }
 
