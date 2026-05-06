@@ -161,6 +161,14 @@ export class SceneController {
       lineState.strokeWidthOverride = override?.strokeWidth;
       lineState.pixelFx             = override?.pixelFx ?? [];
       lineState.decoration          = override?.decoration;
+
+      // Pre-generate per-character decoration size scales so they stay stable across frames
+      if (lineState.decoration?.randomSize) {
+        const r = lineState.decoration.randomRange;
+        for (const c of lineState.chars) {
+          c.decoSizeScale = 1 - r + Math.random() * r * 2;
+        }
+      }
       this.activeLines.push(lineState);
 
       const startSec = lyric.time / 1000;

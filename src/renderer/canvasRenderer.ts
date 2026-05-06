@@ -70,7 +70,7 @@ function drawLineChars(
       const cx = c.x - x;
       const cy = c.y - y;
       const s = dec.randomSize
-        ? dec.size * (1 - dec.randomRange + Math.random() * dec.randomRange * 2)
+        ? dec.size * c.decoSizeScale
         : dec.size;
       if (dec.shape === 'rect') {
         ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
