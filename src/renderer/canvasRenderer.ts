@@ -67,6 +67,7 @@ function drawLineChars(
     ctx.fillStyle = dec.color;
     for (const c of chars) {
       if (c.alpha <= 0) continue;
+      if (c.char.trim() === '') continue;
       const cx = c.x - x;
       const cy = c.y - y;
       const s = dec.randomSize

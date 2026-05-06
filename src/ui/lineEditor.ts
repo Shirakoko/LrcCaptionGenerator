@@ -714,9 +714,9 @@ export class LineEditorUI {
       if (l) l.textContent = sizeLabelText(shapeSel.value);
     });
 
-    // Random size toggle row
+    // Random size toggle + range slider on the same row
     const randToggleRow = document.createElement('div');
-    randToggleRow.className = 'le-row le-deco-toggle-row';
+    randToggleRow.className = 'le-row';
     const randCb = document.createElement('input');
     randCb.type = 'checkbox';
     randCb.className = 'le-pfx-cb';
@@ -724,16 +724,37 @@ export class LineEditorUI {
     randCb.checked = randomSize;
     const randLbl = document.createElement('label');
     randLbl.className = 'le-pfx-label';
-    randLbl.textContent = '随机形状大小';
-    randToggleRow.append(randCb, randLbl);
+    randLbl.textContent = '随机大小';
+
+    // Inline range slider (hidden until checkbox is checked)
+    const randSlider = document.createElement('input');
+    randSlider.type = 'range';
+    randSlider.className = 'le-slider';
+    randSlider.dataset.key = 'deco-random-range';
+    randSlider.min = '0'; randSlider.max = '1'; randSlider.step = '0.05';
+    randSlider.value = String(randomRange);
+    randSlider.hidden = !randomSize;
+
+    const randNum = document.createElement('input');
+    randNum.type = 'number';
+    randNum.className = 'le-num';
+    randNum.min = '0'; randNum.max = '1'; randNum.step = '0.05';
+    randNum.value = String(randomRange);
+    randNum.hidden = !randomSize;
+
+    randSlider.addEventListener('input', () => { randNum.value = randSlider.value; });
+    randNum.addEventListener('input', () => {
+      const v = Math.max(0, Math.min(1, parseFloat(randNum.value) || 0));
+      randSlider.value = String(v);
+    });
+
+    randCb.addEventListener('change', () => {
+      randSlider.hidden = !randCb.checked;
+      randNum.hidden    = !randCb.checked;
+    });
+
+    randToggleRow.append(randCb, randLbl, randSlider, randNum);
     paramsDiv.appendChild(randToggleRow);
-
-    // Random range slider (shown only when random size is on)
-    const randRangeRow = this._sliderRow('随机范围', 'deco-random-range', randomRange, 0, 1, 0.05, '');
-    randRangeRow.hidden = !randomSize;
-    paramsDiv.appendChild(randRangeRow);
-
-    randCb.addEventListener('change', () => { randRangeRow.hidden = !randCb.checked; });
 
     // Color picker
     paramsDiv.appendChild(this._colorRow('颜色', 'deco-color', color));

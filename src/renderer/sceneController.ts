@@ -166,7 +166,7 @@ export class SceneController {
       if (lineState.decoration?.randomSize) {
         const r = lineState.decoration.randomRange;
         for (const c of lineState.chars) {
-          c.decoSizeScale = 1 - r + Math.random() * r * 2;
+          c.decoSizeScale = c.char === ' ' ? 1 : 1 - r + Math.random() * r * 2;
         }
       }
       this.activeLines.push(lineState);
