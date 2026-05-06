@@ -1,5 +1,5 @@
 import type { SceneController, LineParams } from '../renderer/sceneController.ts';
-import type { EntranceName, IdleName, ExitName, LineOverride, PixelFxEntry, PixelFxName } from '../effects/types.ts';
+import type { EntranceName, IdleName, ExitName, LineOverride, PixelFxEntry, PixelFxName, CharDecoration } from '../effects/types.ts';
 import { ENTRANCES, IDLES, EXITS } from '../effects/types.ts';
 import {
   ENTRANCE_PARAMS, IDLE_PARAMS, EXIT_PARAMS,
@@ -19,15 +19,18 @@ function fmtTime(ms: number): string {
 const ENTRANCE_LABELS: Record<EntranceName, string> = {
   typewriter: '打字机', slideLeft: '左滑入', slideRight: '右滑入',
   slideUp: '下滑入', slideDown: '上滑入', scalePop: '弹出',
-  scatter: '散落', flipX: '翻转', blurFade: '模糊淡入', wave: '波浪',
-  fadeIn: '淡入', glitch: '故障闪烁',
+  wave: '波浪', fadeIn: '淡入', glitch: '故障闪烁',
+  flipIn: '垂直翻转', converge: '四面飞来',
 };
 const IDLE_LABELS: Record<IdleName, string> = {
-  float: '浮动', charJitter: '字符抖动', breathe: '呼吸', altFloat: '交错浮动', none: '无',
+  float: '浮动', charJitter: '字符抖动', breathe: '呼吸', altFloat: '交错浮动',
+  ripple: '水波纹', flicker: '明暗闪烁', invertFlicker: '反色闪烁', sway: '左右摇晃',
+  none: '无',
 };
 const EXIT_LABELS: Record<ExitName, string> = {
   fadeOut: '淡出', floatUp: '上飘', floatDown: '下落',
   explode: '爆炸', shrink: '收缩', afterimage: '残影', blurOut: '模糊淡出',
+  squash: '压扁消失',
 };
 
 export class LineEditorUI {
@@ -38,6 +41,11 @@ export class LineEditorUI {
   private canvasHeight: number;
   private selectedIndex = -1;
   private onSeek: ((timeSec: number) => void) | undefined;
+  private onLineSelectCb: ((index: number | null) => void) | undefined;
+
+  onLineSelect(cb: (index: number | null) => void): void {
+    this.onLineSelectCb = cb;
+  }
 
   constructor(
     container: HTMLElement,
@@ -131,6 +139,7 @@ export class LineEditorUI {
       const timeSec = timeMs / 1000;
       this.scene.seek(timeSec);
       this.onSeek?.(timeSec);
+      this.onLineSelectCb?.(this.selectedIndex >= 0 ? this.selectedIndex : null);
       this._render();
       if (this.selectedIndex >= 0) {
         const params = this.scene.getLineParams(this.selectedIndex);
@@ -246,6 +255,10 @@ export class LineEditorUI {
     // ── Pixel effects section ─────────────────────────────────────────────────
     const pixelSec = this._buildPixelFxSection(savedOverride?.pixelFx ?? []);
     this.propsPanel.appendChild(pixelSec);
+
+    // ── Decoration section ────────────────────────────────────────────────────
+    const decoSec = this._buildDecorationSection(savedOverride?.decoration);
+    this.propsPanel.appendChild(decoSec);
   }
 
   // ── Effect group: dropdown + dynamic param sliders ──────────────────────────
@@ -522,6 +535,7 @@ export class LineEditorUI {
       strokeColor: strokeColorEl?.value,
       strokeWidth: strokeWidthEl ? parseFloat(strokeWidthEl.value) : undefined,
       pixelFx:     this._collectPixelFx(panel),
+      decoration:  this._collectDecoration(panel),
     };
   }
 
@@ -626,5 +640,127 @@ export class LineEditorUI {
     sec.appendChild(t);
     rows.forEach(r => sec.appendChild(r));
     return sec;
+  }
+
+  // ── Decoration section ────────────────────────────────────────────────────────
+
+  private _buildDecorationSection(saved?: CharDecoration): HTMLElement {
+    const enabled     = saved?.enabled     ?? false;
+    const shape       = saved?.shape       ?? 'rect';
+    const size        = saved?.size        ?? 30;
+    const color       = saved?.color       ?? '#ffffff';
+    const randomSize  = saved?.randomSize  ?? false;
+    const randomRange = saved?.randomRange ?? 0.3;
+
+    const sec = document.createElement('div');
+    sec.className = 'le-section';
+
+    const title = document.createElement('div');
+    title.className = 'le-section-title';
+    title.textContent = '字符装饰';
+    sec.appendChild(title);
+
+    // Enable toggle row
+    const toggleRow = document.createElement('div');
+    toggleRow.className = 'le-row le-deco-toggle-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'le-pfx-cb';
+    cb.dataset.key = 'deco-enabled';
+    cb.checked = enabled;
+    const lbl = document.createElement('label');
+    lbl.className = 'le-pfx-label';
+    lbl.textContent = '启用背景形状';
+    toggleRow.append(cb, lbl);
+    sec.appendChild(toggleRow);
+
+    // Params area
+    const paramsDiv = document.createElement('div');
+    paramsDiv.className = 'le-pfx-params le-deco-params';
+    paramsDiv.hidden = !enabled;
+
+    // Shape selector
+    const shapeRow = document.createElement('div');
+    shapeRow.className = 'le-row';
+    const shapeLbl = document.createElement('label');
+    shapeLbl.className = 'le-label';
+    shapeLbl.textContent = '形状';
+    const shapeSel = document.createElement('select');
+    shapeSel.className = 'le-select';
+    shapeSel.dataset.key = 'deco-shape';
+    const shapeOptions: Array<['rect' | 'circle' | 'diamond', string]> = [
+      ['rect',    '方形'],
+      ['circle',  '圆形'],
+      ['diamond', '菱形'],
+    ];
+    shapeOptions.forEach(([v, label]) => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = label;
+      if (v === shape) opt.selected = true;
+      shapeSel.appendChild(opt);
+    });
+    shapeRow.append(shapeLbl, shapeSel);
+    paramsDiv.appendChild(shapeRow);
+
+    // Size slider — label depends on shape
+    const sizeLabelText = (s: string) => s === 'circle' ? '半径' : '半边长';
+    const sizeRow = this._sliderRow(sizeLabelText(shape), 'deco-size', size, 4, 200, 1, 'px');
+    paramsDiv.appendChild(sizeRow);
+
+    // Update size label when shape changes
+    shapeSel.addEventListener('change', () => {
+      const l = sizeRow.querySelector<HTMLElement>('.le-label');
+      if (l) l.textContent = sizeLabelText(shapeSel.value);
+    });
+
+    // Random size toggle row
+    const randToggleRow = document.createElement('div');
+    randToggleRow.className = 'le-row le-deco-toggle-row';
+    const randCb = document.createElement('input');
+    randCb.type = 'checkbox';
+    randCb.className = 'le-pfx-cb';
+    randCb.dataset.key = 'deco-random-size';
+    randCb.checked = randomSize;
+    const randLbl = document.createElement('label');
+    randLbl.className = 'le-pfx-label';
+    randLbl.textContent = '随机形状大小';
+    randToggleRow.append(randCb, randLbl);
+    paramsDiv.appendChild(randToggleRow);
+
+    // Random range slider (shown only when random size is on)
+    const randRangeRow = this._sliderRow('随机范围', 'deco-random-range', randomRange, 0, 1, 0.05, '');
+    randRangeRow.hidden = !randomSize;
+    paramsDiv.appendChild(randRangeRow);
+
+    randCb.addEventListener('change', () => { randRangeRow.hidden = !randCb.checked; });
+
+    // Color picker
+    paramsDiv.appendChild(this._colorRow('颜色', 'deco-color', color));
+
+    sec.appendChild(paramsDiv);
+    cb.addEventListener('change', () => { paramsDiv.hidden = !cb.checked; });
+
+    return sec;
+  }
+
+  private _collectDecoration(panel: HTMLElement): CharDecoration | undefined {
+    const cb = panel.querySelector<HTMLInputElement>('input[data-key="deco-enabled"]');
+    if (!cb) return undefined;
+
+    const shapeSel   = panel.querySelector<HTMLSelectElement>('select[data-key="deco-shape"]');
+    const sizeEl     = panel.querySelector<HTMLInputElement>('input[type="range"][data-key="deco-size"]');
+    const colorEl    = panel.querySelector<HTMLInputElement>('input[type="color"][data-key="deco-color"]');
+    const randCbEl   = panel.querySelector<HTMLInputElement>('input[data-key="deco-random-size"]');
+    const randRangeEl = panel.querySelector<HTMLInputElement>('input[type="range"][data-key="deco-random-range"]');
+
+    return {
+      enabled:     cb.checked,
+      shape:       (shapeSel?.value ?? 'rect') as 'rect' | 'circle' | 'diamond',
+      size:        parseFloat(sizeEl?.value ?? '30'),
+      color:       colorEl?.value ?? '#ffffff',
+      randomSize:  randCbEl?.checked ?? false,
+      randomRange: parseFloat(randRangeEl?.value ?? '0.3'),
+    };
   }
 }

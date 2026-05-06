@@ -96,5 +96,18 @@ export function buildExit(
       }
       break;
     }
+
+    case 'squash': {
+      const duration = params.duration ?? 0.35;
+      // Squash: compress scaleY to 0, slightly widen scaleX, then snap alpha to 0
+      tl.to(line, {
+        scaleY: 0,
+        scaleX: 1.3,
+        duration,
+        ease: 'power3.in',
+      }, at);
+      tl.to(line, { alpha: 0, duration: 0.05 }, at + duration);
+      break;
+    }
   }
 }

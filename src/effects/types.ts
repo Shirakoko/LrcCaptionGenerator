@@ -24,6 +24,22 @@ export interface CharState {
   // 基准位置（不被 tween 修改）
   baseX: number;
   baseY: number;
+  /** Per-character size multiplier for decoration randomisation (generated once at init) */
+  decoSizeScale: number;
+}
+
+// ── Char decoration (background shape behind each character) ──────────────────
+
+export interface CharDecoration {
+  enabled: boolean;
+  shape: 'rect' | 'circle' | 'diamond';
+  /** Half-side for rect/diamond, radius for circle, in px */
+  size: number;
+  color: string;
+  /** If true, each character's shape size is randomised per-frame */
+  randomSize: boolean;
+  /** Fraction of size to vary: actual size ∈ [size*(1-r), size*(1+r)] */
+  randomRange: number;
 }
 
 // ── Pixel effects ─────────────────────────────────────────────────────────────
@@ -53,6 +69,7 @@ export interface LineState {
   fillColor?: string;
   strokeColor?: string;
   pixelFx: PixelFxEntry[];
+  decoration?: CharDecoration;
 }
 
 export type EntranceName =
@@ -62,18 +79,21 @@ export type EntranceName =
   | 'slideUp'
   | 'slideDown'
   | 'scalePop'
-  | 'scatter'
-  | 'flipX'
-  | 'blurFade'
   | 'wave'
   | 'fadeIn'
-  | 'glitch';
+  | 'glitch'
+  | 'flipIn'
+  | 'converge';
 
 export type IdleName =
   | 'float'
   | 'charJitter'
   | 'breathe'
   | 'altFloat'
+  | 'ripple'
+  | 'flicker'
+  | 'invertFlicker'
+  | 'sway'
   | 'none';
 
 export type ExitName =
@@ -83,7 +103,8 @@ export type ExitName =
   | 'explode'
   | 'shrink'
   | 'afterimage'
-  | 'blurOut';
+  | 'blurOut'
+  | 'squash';
 
 export interface EffectSet {
   entrance: EntranceName;
@@ -93,10 +114,11 @@ export interface EffectSet {
 
 export const ENTRANCES: EntranceName[] = [
   'typewriter', 'slideLeft', 'slideRight', 'slideUp', 'slideDown',
-  'scalePop', 'scatter', 'flipX', 'blurFade', 'wave', 'fadeIn', 'glitch',
+  'scalePop', 'wave', 'fadeIn', 'glitch',
+  'flipIn', 'converge',
 ];
-export const IDLES: IdleName[] = ['float', 'charJitter', 'breathe', 'altFloat', 'none'];
-export const EXITS: ExitName[] = ['fadeOut', 'floatUp', 'floatDown', 'explode', 'shrink', 'afterimage', 'blurOut'];
+export const IDLES: IdleName[] = ['float', 'charJitter', 'breathe', 'altFloat', 'ripple', 'flicker', 'invertFlicker', 'sway', 'none'];
+export const EXITS: ExitName[] = ['fadeOut', 'floatUp', 'floatDown', 'explode', 'shrink', 'afterimage', 'blurOut', 'squash'];
 
 // ── Override types ────────────────────────────────────────────────────────────
 
@@ -127,6 +149,7 @@ export interface LineOverride {
   strokeColor?: string;
   strokeWidth?: number;
   pixelFx?: PixelFxEntry[];
+  decoration?: CharDecoration;
 }
 
 export type OverrideMap = Record<number, LineOverride>;
@@ -140,5 +163,5 @@ export function pickEffects(rng: Prng, override?: EffectOverride): EffectSet {
 }
 
 export function makeCharState(char: string, x: number, y: number): CharState {
-  return { char, x, y, baseX: x, baseY: y, alpha: 1, scaleX: 1, scaleY: 1, rotation: 0, blur: 0 };
+  return { char, x, y, baseX: x, baseY: y, alpha: 1, scaleX: 1, scaleY: 1, rotation: 0, blur: 0, decoSizeScale: 1 };
 }

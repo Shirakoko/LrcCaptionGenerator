@@ -29,6 +29,13 @@ export type MediaResolver = (timeSec: number) => {
   saturate: number;
 } | null;
 
+export type TransitionResolver = (timeSec: number) => {
+  fromClip: { element: HTMLImageElement; brightness: number; contrast: number; saturate: number };
+  toClip:   { element: HTMLImageElement; brightness: number; contrast: number; saturate: number };
+  progress: number;
+  type: 'dissolve' | 'black_fade';
+} | null;
+
 export class SceneController {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -39,6 +46,7 @@ export class SceneController {
   private isPlaying = false;
   transparentBg = false;
   private mediaResolver: MediaResolver | null = null;
+  private transitionResolver: TransitionResolver | null = null;
 
   // Stored state for rebuilding
   private lyrics: LyricLine[] = [];
@@ -71,9 +79,34 @@ export class SceneController {
     this.mediaResolver = fn;
   }
 
+  setTransitionResolver(fn: TransitionResolver | null): void {
+    this.transitionResolver = fn;
+  }
+
   private _activeCfg(timeSec?: number): RenderConfig {
-    if (!this.mediaResolver) return this.cfg;
     const t = timeSec ?? this.currentTime;
+
+    // Check transition first — overrides normal media resolver
+    if (this.transitionResolver) {
+      const trans = this.transitionResolver(t);
+      if (trans) {
+        return {
+          ...this.cfg,
+          bgImage:  trans.fromClip.element,
+          bgBrightness: trans.fromClip.brightness,
+          bgContrast:   trans.fromClip.contrast,
+          bgSaturate:   trans.fromClip.saturate,
+          bgImage2:  trans.toClip.element,
+          bgImage2Brightness: trans.toClip.brightness,
+          bgImage2Contrast:   trans.toClip.contrast,
+          bgImage2Saturate:   trans.toClip.saturate,
+          bgBlend: trans.progress,
+          bgTransitionType: trans.type,
+        };
+      }
+    }
+
+    if (!this.mediaResolver) return this.cfg;
     const m = this.mediaResolver(t);
     if (!m) return { ...this.cfg, bgImage: null };
     return {
@@ -127,6 +160,7 @@ export class SceneController {
       lineState.strokeColor         = override?.strokeColor;
       lineState.strokeWidthOverride = override?.strokeWidth;
       lineState.pixelFx             = override?.pixelFx ?? [];
+      lineState.decoration          = override?.decoration;
       this.activeLines.push(lineState);
 
       const startSec = lyric.time / 1000;
@@ -231,6 +265,11 @@ export class SceneController {
 
   getLyrics(): LyricLine[] {
     return this.lyrics;
+  }
+
+  /** 仅更新歌词时间数据，不重建动画时间轴（用于时间轴拖拽同步） */
+  updateLyrics(lyrics: LyricLine[]): void {
+    this.lyrics = lyrics;
   }
 
   /** 返回覆盖表的浅拷贝，用于跨 build 保留 */

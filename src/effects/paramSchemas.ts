@@ -83,20 +83,6 @@ export const ENTRANCE_PARAMS: Record<EntranceName, ParamDef[]> = {
     { key: 'stagger',     label: '字符错位', min: 0,   max: 0.15, step: 0.01, unit: 's', default: 0.05 },
     { key: 'elasticity',  label: '弹性强度', min: 0.3, max: 3.0,  step: 0.1,  unit: '',  default: 1.0  },
   ],
-  scatter: [
-    { key: 'spreadX',  label: '水平散布', min: 50,  max: 400, step: 10,   unit: 'px', default: 200  },
-    { key: 'spreadY',  label: '垂直散布', min: 50,  max: 300, step: 10,   unit: 'px', default: 150  },
-    { key: 'duration', label: '动画时长', min: 0.2, max: 1.5, step: 0.05, unit: 's',  default: 0.55 },
-  ],
-  flipX: [
-    { key: 'duration', label: '动画时长', min: 0.2, max: 1.5,  step: 0.05, unit: 's', default: 0.55 },
-    { key: 'stagger',  label: '字符错位', min: 0,   max: 0.15, step: 0.01, unit: 's', default: 0.05 },
-  ],
-  blurFade: [
-    { key: 'blurAmount', label: '模糊程度', min: 5,   max: 60,  step: 5,    unit: 'px', default: 20   },
-    { key: 'duration',   label: '动画时长', min: 0.2, max: 1.5, step: 0.05, unit: 's',  default: 0.55 },
-    { key: 'stagger',    label: '字符错位', min: 0,   max: 0.12, step: 0.01, unit: 's', default: 0.04 },
-  ],
   wave: [
     { key: 'waveHeight', label: '波浪高度', min: 5,    max: 80,   step: 5,    unit: 'px', default: 30   },
     { key: 'duration',   label: '动画时长', min: 0.2,  max: 1.5,  step: 0.05, unit: 's',  default: 0.55 },
@@ -110,6 +96,16 @@ export const ENTRANCE_PARAMS: Record<EntranceName, ParamDef[]> = {
     { key: 'intensity',  label: '偏移强度', min: 5,    max: 100, step: 5,    unit: 'px', default: 30   },
     { key: 'flashCount', label: '闪动次数', min: 1,    max: 8,   step: 1,    unit: '',   default: 3    },
     { key: 'flashDur',   label: '闪动时长', min: 0.03, max: 0.2, step: 0.01, unit: 's',  default: 0.08 },
+  ],
+  flipIn: [
+    { key: 'duration',   label: '动画时长', min: 0.2, max: 1.5,  step: 0.05, unit: 's', default: 0.6  },
+    { key: 'stagger',    label: '字符错位', min: 0,   max: 0.15, step: 0.01, unit: 's', default: 0.06 },
+    { key: 'elasticity', label: '弹性强度', min: 0.3, max: 3.0,  step: 0.1,  unit: '',  default: 1.0  },
+  ],
+  converge: [
+    { key: 'spreadX',  label: '水平散布', min: 50,  max: 400, step: 10,   unit: 'px', default: 200 },
+    { key: 'spreadY',  label: '垂直散布', min: 50,  max: 300, step: 10,   unit: 'px', default: 150 },
+    { key: 'duration', label: '动画时长', min: 0.2, max: 1.5, step: 0.05, unit: 's',  default: 0.6 },
   ],
 };
 
@@ -131,6 +127,22 @@ export const IDLE_PARAMS: Record<IdleName, ParamDef[]> = {
   altFloat: [
     { key: 'amplitude', label: '浮动幅度', min: 2, max: 30, step: 1,   unit: 'px', default: 8   },
     { key: 'period',    label: '周期',     min: 1, max: 6,  step: 0.5, unit: 's',  default: 2   },
+  ],
+  ripple: [
+    { key: 'amplitude', label: '拉伸量', min: 1.05, max: 1.3, step: 0.01, unit: 'x', default: 1.15 },
+    { key: 'period',    label: '周期',   min: 0.5,  max: 4,   step: 0.1,  unit: 's', default: 1.5  },
+  ],
+  flicker: [
+    { key: 'minAlpha', label: '最低亮度', min: 0,    max: 0.8, step: 0.05, unit: '',  default: 0.1  },
+    { key: 'speed',    label: '闪烁速度', min: 0.05, max: 0.5, step: 0.05, unit: 's', default: 0.15 },
+  ],
+  invertFlicker: [
+    { key: 'period', label: '切换周期', min: 0.1, max: 2,   step: 0.05, unit: 's', default: 0.3 },
+    { key: 'duty',   label: '反色占比', min: 0.1, max: 0.9, step: 0.05, unit: '',  default: 0.5 },
+  ],
+  sway: [
+    { key: 'angle',  label: '摇摆角度', min: 2,  max: 30, step: 1,   unit: '°', default: 10  },
+    { key: 'period', label: '周期',     min: 0.5, max: 4,  step: 0.1, unit: 's', default: 1.5 },
   ],
   none: [],
 };
@@ -168,5 +180,8 @@ export const EXIT_PARAMS: Record<ExitName, ParamDef[]> = {
     { key: 'blurAmount', label: '模糊程度', min: 5,   max: 60,   step: 5,    unit: 'px', default: 20   },
     { key: 'duration',   label: '动画时长', min: 0.2, max: 1.5,  step: 0.05, unit: 's',  default: 0.45 },
     { key: 'stagger',    label: '字符错位', min: 0,   max: 0.12, step: 0.01, unit: 's',  default: 0.03 },
+  ],
+  squash: [
+    { key: 'duration', label: '压扁时长', min: 0.1, max: 1.0, step: 0.05, unit: 's', default: 0.35 },
   ],
 };

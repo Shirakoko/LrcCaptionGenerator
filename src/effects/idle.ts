@@ -89,5 +89,67 @@ export function buildIdleTween(
       }, at);
       break;
     }
+
+    case 'ripple': {
+      const amplitude = params.amplitude ?? 1.15;
+      const period    = params.period    ?? 1.5;
+      for (let i = 0; i < n; i++) {
+        const c = chars[i];
+        tl.to(c, {
+          scaleX: amplitude,
+          duration: period / 4,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: Math.ceil(duration / (period / 2)),
+        }, at + i * 0.06);
+      }
+      break;
+    }
+
+    case 'flicker': {
+      const minAlpha = params.minAlpha ?? 0.1;
+      const speed    = params.speed    ?? 0.15;
+      tl.to(line, {
+        alpha: minAlpha,
+        duration: speed / 2,
+        ease: 'none',
+        yoyo: true,
+        repeat: Math.ceil(duration / speed),
+      }, at);
+      break;
+    }
+
+    case 'invertFlicker': {
+      const period = params.period ?? 0.3;
+      const duty   = params.duty   ?? 0.5;
+      const originalColor = line.fillColor;
+      if (!originalColor) break;
+      const inverted = '#' + originalColor.slice(1).match(/.{2}/g)!
+        .map(h => (255 - parseInt(h, 16)).toString(16).padStart(2, '0'))
+        .join('');
+      const repeats = Math.ceil(duration / period);
+      for (let k = 0; k < repeats; k++) {
+        tl.set(line, { fillColor: inverted },       at + k * period);
+        tl.set(line, { fillColor: originalColor },  at + k * period + period * duty);
+      }
+      break;
+    }
+
+    case 'sway': {
+      const angle  = params.angle  ?? 10;
+      const period = params.period ?? 1.5;
+      for (let i = 0; i < n; i++) {
+        const c = chars[i];
+        c.rotation = -angle;
+        tl.to(c, {
+          rotation: angle,
+          duration: period / 2,
+          ease: 'sine.inOut',
+          yoyo: true,
+          repeat: Math.ceil(duration / period),
+        }, at + i * 0.04);
+      }
+      break;
+    }
   }
 }

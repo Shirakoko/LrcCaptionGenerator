@@ -2,6 +2,11 @@ import type { LyricLine } from '../parser/lrcParser.ts';
 
 // ── Data models ───────────────────────────────────────────────────────────────
 
+export interface MediaTransition {
+  type: 'none' | 'dissolve' | 'black_fade';
+  duration: number; // seconds, default 0.5
+}
+
 export interface MediaClip {
   id: string;
   type: 'image';
@@ -13,6 +18,7 @@ export interface MediaClip {
   contrast: number;
   saturate: number;
   thumbnail: string;  // data URL
+  transitionIn?: MediaTransition; // transition with the previous clip
 }
 
 export interface AudioClip {
@@ -25,11 +31,20 @@ export interface AudioClip {
   name: string;
 }
 
+export interface CaptionSegment {
+  id: string;
+  text: string;
+  start: number; // seconds
+  end: number;   // seconds
+  source: 'lrc' | 'manual';
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_IMG_DUR = 5;
 const ZOOM_LEVELS = [20, 40, 80, 160, 240]; // px per second
 const DEFAULT_ZOOM_IDX = 1; // 40 px/s
+const MIN_CAPTION_DUR = 0.1; // seconds
 
 function uid(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -41,12 +56,18 @@ export class TimelineController {
   mediaClips: MediaClip[] = [];
   audioClips: AudioClip[] = [];
 
-  private captionLyrics: LyricLine[] = [];
+  private captionSegments: CaptionSegment[] = [];
+  private selectedCaptionId: string | null = null;
   private zoomIdx = DEFAULT_ZOOM_IDX;
 
   private onChangeCbs: Array<() => void> = [];
   private onSeekCb?: (t: number) => void;
   private onCaptionClickCbs: Array<(idx: number, t: number) => void> = [];
+  private onCaptionSelectChangeCbs: Array<(idx: number | null) => void> = [];
+
+  // Transition popover state
+  private transPopoverEl: HTMLElement | null = null;
+  private transPopoverClipId: string | null = null;
 
   // DOM refs
   private scrollAreaEl: HTMLElement;
@@ -69,6 +90,7 @@ export class TimelineController {
     this._setupZoom();
     this._setupRulerClick();
     this._setupPlayheadDrag();
+    this._setupKeyboard();
   }
 
   // ── Public getters ─────────────────────────────────────────────────────────
@@ -80,8 +102,7 @@ export class TimelineController {
       ? Math.max(...this.mediaClips.map(c => c.startTime + c.duration)) : 0;
     const a = this.audioClips.length > 0
       ? Math.max(...this.audioClips.map(c => c.startTime + c.duration)) : 0;
-    const c = this.captionLyrics.length > 0
-      ? (this.captionLyrics.at(-1)!.time + this.captionLyrics.at(-1)!.duration) / 1000 : 0;
+    const c = this.captionSegments.length > 0 ? this.captionSegments.at(-1)!.end : 0;
     return Math.max(m, a, c, 1);
   }
 
@@ -91,6 +112,9 @@ export class TimelineController {
   onSeek(cb: (t: number) => void): void { this.onSeekCb = cb; }
   onCaptionClick(cb: (idx: number, t: number) => void): void {
     this.onCaptionClickCbs.push(cb);
+  }
+  onCaptionSelectionChange(cb: (idx: number | null) => void): void {
+    this.onCaptionSelectChangeCbs.push(cb);
   }
 
   private _notify(): void { for (const cb of this.onChangeCbs) cb(); }
@@ -119,6 +143,149 @@ export class TimelineController {
       if (t >= c.startTime && t < c.startTime + c.duration) return c;
     }
     return null;
+  }
+
+  getTransitionAtTime(t: number): {
+    fromClip: MediaClip;
+    toClip: MediaClip;
+    progress: number;
+    type: 'dissolve' | 'black_fade';
+  } | null {
+    for (let i = 1; i < this.mediaClips.length; i++) {
+      const prev = this.mediaClips[i - 1];
+      const curr = this.mediaClips[i];
+      if (!curr.transitionIn || curr.transitionIn.type === 'none') continue;
+      // Only if clips are adjacent
+      if (Math.abs(prev.startTime + prev.duration - curr.startTime) > 0.01) continue;
+
+      const td = curr.transitionIn.duration;
+      const tJoin = curr.startTime;
+      const transStart = tJoin - td / 2;
+      const transEnd = tJoin + td / 2;
+
+      if (t >= transStart && t < transEnd) {
+        const progress = (t - transStart) / td;
+        return { fromClip: prev, toClip: curr, progress, type: curr.transitionIn.type };
+      }
+    }
+    return null;
+  }
+
+  // ── Caption data API ───────────────────────────────────────────────────────
+
+  hasCaptionData(): boolean {
+    return this.captionSegments.length > 0;
+  }
+
+  setCaptionLyrics(lyrics: LyricLine[]): void {
+    this.captionSegments = this._lyricsToSegments(lyrics);
+    this.selectedCaptionId = null;
+    this._renderCaptionTrack();
+    this._renderRuler();
+    this._updateInnerWidth();
+    for (const cb of this.onCaptionSelectChangeCbs) cb(null);
+  }
+
+  clearCaptionSegments(): void {
+    this.captionSegments = [];
+    this.selectedCaptionId = null;
+    this._renderCaptionTrack();
+    this._renderRuler();
+    this._updateInnerWidth();
+    for (const cb of this.onCaptionSelectChangeCbs) cb(null);
+  }
+
+  getCaptionAsLyrics(): LyricLine[] {
+    return this.captionSegments.map(s => ({
+      time: Math.round(s.start * 1000),
+      text: s.text,
+      duration: Math.round((s.end - s.start) * 1000),
+    }));
+  }
+
+  insertCaption(): void {
+    const NEW_DUR = 1.0;
+
+    if (this.captionSegments.length === 0) {
+      // Empty track: insert at time 0
+      const newSeg: CaptionSegment = { id: uid(), text: '新字幕', start: 0, end: NEW_DUR, source: 'manual' };
+      this.captionSegments.push(newSeg);
+      this.selectedCaptionId = newSeg.id;
+      this._renderCaptionTrack();
+      this._renderRuler();
+      this._updateInnerWidth();
+      for (const cb of this.onCaptionSelectChangeCbs) cb(0);
+      for (const cb of this.onCaptionClickCbs) cb(0, 0);
+      this._notify();
+      return;
+    }
+
+    const selectedIdx = this.captionSegments.findIndex(s => s.id === this.selectedCaptionId);
+    if (selectedIdx === -1) return; // No selection — button should be disabled
+
+    const afterSeg = this.captionSegments[selectedIdx];
+    const newStart = afterSeg.end;
+    const newSeg: CaptionSegment = {
+      id: uid(), text: '新字幕', start: newStart, end: newStart + NEW_DUR, source: 'manual',
+    };
+
+    // Shift subsequent segments by NEW_DUR
+    for (let i = selectedIdx + 1; i < this.captionSegments.length; i++) {
+      this.captionSegments[i].start += NEW_DUR;
+      this.captionSegments[i].end += NEW_DUR;
+    }
+
+    this.captionSegments.splice(selectedIdx + 1, 0, newSeg);
+    this.selectedCaptionId = newSeg.id;
+
+    this._renderCaptionTrack();
+    this._renderRuler();
+    this._updateInnerWidth();
+
+    const newIdx = selectedIdx + 1;
+    for (const cb of this.onCaptionSelectChangeCbs) cb(newIdx);
+    for (const cb of this.onCaptionClickCbs) cb(newIdx, newStart);
+    this._notify();
+
+    // Scroll new segment into view
+    const x = this._timeToPx(newStart);
+    const viewW = this.scrollAreaEl.clientWidth;
+    if (x > this.scrollAreaEl.scrollLeft + viewW - 40 || x < this.scrollAreaEl.scrollLeft) {
+      this.scrollAreaEl.scrollLeft = Math.max(0, x - 40);
+    }
+  }
+
+  deleteSelectedCaption(): void {
+    const idx = this.captionSegments.findIndex(s => s.id === this.selectedCaptionId);
+    if (idx === -1) return;
+
+    const deleted = this.captionSegments[idx];
+
+    if (this.captionSegments.length === 1) {
+      this.captionSegments = [];
+      this.selectedCaptionId = null;
+      for (const cb of this.onCaptionSelectChangeCbs) cb(null);
+    } else if (idx === 0) {
+      // First segment: next segment's start moves to fill
+      this.captionSegments[1].start = deleted.start;
+      this.captionSegments.splice(0, 1);
+      this.selectedCaptionId = this.captionSegments[0].id;
+      for (const cb of this.onCaptionSelectChangeCbs) cb(0);
+      for (const cb of this.onCaptionClickCbs) cb(0, this.captionSegments[0].start);
+    } else {
+      // Non-first segment: previous segment's end extends to fill
+      this.captionSegments[idx - 1].end = deleted.end;
+      this.captionSegments.splice(idx, 1);
+      const newIdx = idx - 1;
+      this.selectedCaptionId = this.captionSegments[newIdx].id;
+      for (const cb of this.onCaptionSelectChangeCbs) cb(newIdx);
+      for (const cb of this.onCaptionClickCbs) cb(newIdx, this.captionSegments[newIdx].start);
+    }
+
+    this._renderCaptionTrack();
+    this._renderRuler();
+    this._updateInnerWidth();
+    this._notify();
   }
 
   // ── Media track ────────────────────────────────────────────────────────────
@@ -204,15 +371,6 @@ export class TimelineController {
     for (const c of this.audioClips) { c.startTime = t; t += c.duration; }
   }
 
-  // ── Caption track ──────────────────────────────────────────────────────────
-
-  setCaptionLyrics(lyrics: LyricLine[]): void {
-    this.captionLyrics = lyrics;
-    this._renderCaptionTrack();
-    this._renderRuler();
-    this._updateInnerWidth();
-  }
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   renderAll(): void {
@@ -238,7 +396,6 @@ export class TimelineController {
     let tickSec = 1;
     if (pps < 20) tickSec = 10;
     else if (pps < 40) tickSec = 5;
-    else if (pps < 80) tickSec = 2;
     else if (pps >= 160) tickSec = 0.5;
 
     const n = Math.ceil(dur / tickSec);
@@ -265,6 +422,19 @@ export class TimelineController {
     this.mediaContentEl.innerHTML = '';
     for (const clip of this.mediaClips) {
       this.mediaContentEl.appendChild(this._makeMediaClipEl(clip));
+    }
+    // Add transition buttons between adjacent clips
+    for (let i = 1; i < this.mediaClips.length; i++) {
+      const prev = this.mediaClips[i - 1];
+      const curr = this.mediaClips[i];
+      if (Math.abs(prev.startTime + prev.duration - curr.startTime) < 0.01) {
+        const prevW = Math.max(8, this._timeToPx(prev.duration));
+        const currW = Math.max(8, this._timeToPx(curr.duration));
+        // Only show button if there's enough room
+        if (Math.min(prevW, currW) >= 16) {
+          this.mediaContentEl.appendChild(this._makeTransitionBtn(i, curr));
+        }
+      }
     }
   }
 
@@ -325,33 +495,310 @@ export class TimelineController {
     return el;
   }
 
+  // ── Transition button ──────────────────────────────────────────────────────
+
+  private _makeTransitionBtn(toIdx: number, toClip: MediaClip): HTMLElement {
+    const x = this._timeToPx(toClip.startTime);
+    const trans = toClip.transitionIn;
+    const hasTransition = trans && trans.type !== 'none';
+
+    const btn = document.createElement('button');
+    btn.className = 'tl-transition-btn' + (hasTransition ? ' tl-transition-btn--active' : '');
+    btn.style.left = x + 'px';
+
+    const typeLabel: Record<string, string> = {
+      dissolve: '混合淡化',
+      black_fade: '黑幕过渡',
+      none: '无（硬切）',
+    };
+    btn.title = typeLabel[trans?.type ?? 'none'];
+    btn.textContent = '⊕';
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      this._showTransPopover(btn, toIdx);
+    });
+
+    return btn;
+  }
+
+  private _ensureTransPopover(): HTMLElement {
+    if (this.transPopoverEl) return this.transPopoverEl;
+
+    const el = document.createElement('div');
+    el.className = 'tl-transition-popover';
+    el.innerHTML = `
+      <div class="tl-trans-title">选择转场效果</div>
+      <label class="tl-trans-opt"><input type="radio" name="tl-trans-type" value="none" checked> 无（硬切）</label>
+      <label class="tl-trans-opt"><input type="radio" name="tl-trans-type" value="dissolve"> 混合淡化</label>
+      <label class="tl-trans-opt"><input type="radio" name="tl-trans-type" value="black_fade"> 黑幕过渡</label>
+      <div class="tl-trans-dur">
+        <span>时长：</span>
+        <input class="tl-trans-dur-input" type="number" min="0.1" max="2.0" step="0.1" value="0.5">
+        <span>s</span>
+      </div>
+      <div class="tl-trans-warn" hidden>时长已自动限制</div>
+    `;
+
+    el.querySelectorAll<HTMLInputElement>('[name="tl-trans-type"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (radio.checked) this._applyTransType(radio.value as 'none' | 'dissolve' | 'black_fade');
+      });
+    });
+
+    el.querySelector<HTMLInputElement>('.tl-trans-dur-input')!.addEventListener('change', ev => {
+      const val = parseFloat((ev.target as HTMLInputElement).value) || 0.5;
+      this._applyTransDur(val);
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (ev) => {
+      if (this.transPopoverEl?.style.display === 'block' && !el.contains(ev.target as Node)) {
+        el.style.display = 'none';
+      }
+    }, true);
+
+    el.style.display = 'none';
+    document.body.appendChild(el);
+    this.transPopoverEl = el;
+    return el;
+  }
+
+  private _showTransPopover(anchorEl: HTMLElement, toIdx: number): void {
+    const popover = this._ensureTransPopover();
+    const clip = this.mediaClips[toIdx];
+    if (!clip) return;
+    this.transPopoverClipId = clip.id;
+
+    const type = clip.transitionIn?.type ?? 'none';
+    const dur = clip.transitionIn?.duration ?? 0.5;
+
+    popover.querySelectorAll<HTMLInputElement>('[name="tl-trans-type"]').forEach(r => {
+      r.checked = r.value === type;
+    });
+    const durInput = popover.querySelector<HTMLInputElement>('.tl-trans-dur-input')!;
+    durInput.value = String(dur);
+    popover.querySelector<HTMLElement>('.tl-trans-warn')!.hidden = true;
+
+    const rect = anchorEl.getBoundingClientRect();
+    popover.style.display = 'block';
+    // Position below the button, clamped to viewport
+    const popW = 180;
+    const left = Math.min(Math.max(0, rect.left - popW / 2 + rect.width / 2), window.innerWidth - popW);
+    popover.style.left = left + 'px';
+    popover.style.top = (rect.bottom + 6) + 'px';
+  }
+
+  private _applyTransType(type: 'none' | 'dissolve' | 'black_fade'): void {
+    const clip = this.mediaClips.find(c => c.id === this.transPopoverClipId);
+    if (!clip) return;
+
+    if (type === 'none') {
+      clip.transitionIn = undefined;
+    } else {
+      clip.transitionIn = { type, duration: clip.transitionIn?.duration ?? 0.5 };
+    }
+
+    this._renderMediaTrack();
+    this._notify();
+  }
+
+  private _applyTransDur(dur: number): void {
+    const clip = this.mediaClips.find(c => c.id === this.transPopoverClipId);
+    if (!clip || !clip.transitionIn || clip.transitionIn.type === 'none') return;
+
+    const idx = this.mediaClips.indexOf(clip);
+    if (idx <= 0) return;
+    const prevClip = this.mediaClips[idx - 1];
+
+    // Clamp: duration ≤ min(prevDur, currDur) / 2
+    const maxDur = Math.min(prevClip.duration, clip.duration) / 2;
+    const clamped = Math.round(Math.min(maxDur, Math.max(0.1, dur)) * 10) / 10;
+
+    const warnEl = this.transPopoverEl?.querySelector<HTMLElement>('.tl-trans-warn');
+    if (warnEl) warnEl.hidden = clamped >= dur;
+
+    clip.transitionIn.duration = clamped;
+    // Update input to reflect clamped value
+    const durInput = this.transPopoverEl?.querySelector<HTMLInputElement>('.tl-trans-dur-input');
+    if (durInput) durInput.value = String(clamped);
+
+    this._notify();
+  }
+
   // ── Caption track render ───────────────────────────────────────────────────
 
   private _renderCaptionTrack(): void {
     this.captionContentEl.innerHTML = '';
-    for (let i = 0; i < this.captionLyrics.length; i++) {
-      const lyric = this.captionLyrics[i];
-      const startSec = lyric.time / 1000;
-      const durSec   = lyric.duration / 1000;
+
+    for (let i = 0; i < this.captionSegments.length; i++) {
+      const seg = this.captionSegments[i];
+      const left = this._timeToPx(seg.start);
+      const width = Math.max(8, this._timeToPx(seg.end - seg.start));
 
       const el = document.createElement('div');
       el.className = 'tl-clip tl-clip--caption';
-      el.dataset.lineIdx = String(i);
-      el.style.left  = this._timeToPx(startSec) + 'px';
-      el.style.width = Math.max(8, this._timeToPx(durSec)) + 'px';
-      el.title = lyric.text;
+      if (seg.id === this.selectedCaptionId) el.classList.add('selected');
+      el.dataset.segId = seg.id;
+      el.style.left = left + 'px';
+      el.style.width = width + 'px';
+      el.title = seg.text;
 
       const span = document.createElement('span');
       span.className = 'tl-clip-text';
-      span.textContent = lyric.text;
+      span.textContent = seg.text;
       el.appendChild(span);
 
-      el.addEventListener('click', () => {
-        for (const cb of this.onCaptionClickCbs) cb(i, startSec);
+      const idx = i; // capture for closures
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        this._selectCaption(seg.id, idx);
+      });
+
+      el.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        this._selectCaption(seg.id, idx);
+        if (confirm(`删除字幕 "${seg.text}"？`)) {
+          this.deleteSelectedCaption();
+        }
       });
 
       this.captionContentEl.appendChild(el);
+
+      // Drag border between this and the next segment
+      if (i < this.captionSegments.length - 1) {
+        this.captionContentEl.appendChild(this._makeCaptionBorder(i, false));
+      }
     }
+
+    // Right-edge drag handle for the last segment
+    if (this.captionSegments.length > 0) {
+      this.captionContentEl.appendChild(
+        this._makeCaptionBorder(this.captionSegments.length - 1, true)
+      );
+    }
+  }
+
+  private _makeCaptionBorder(leftIdx: number, isRightEdge: boolean): HTMLElement {
+    const seg = this.captionSegments[leftIdx];
+    const x = this._timeToPx(seg.end);
+
+    const el = document.createElement('div');
+    el.className = 'tl-caption-border' + (isRightEdge ? ' tl-caption-border--right-edge' : '');
+    el.style.left = (x - 4) + 'px';
+
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      this._startBorderDrag(e, leftIdx, el, isRightEdge);
+    });
+
+    return el;
+  }
+
+  private _startBorderDrag(
+    e: MouseEvent,
+    leftIdx: number,
+    borderEl: HTMLElement,
+    isRightEdge: boolean,
+  ): void {
+    const leftSeg = this.captionSegments[leftIdx];
+    const rightSeg = isRightEdge ? null : this.captionSegments[leftIdx + 1];
+    const startX = e.clientX;
+    const startEnd = leftSeg.end;
+
+    document.body.style.cursor = 'col-resize';
+    borderEl.classList.add('dragging');
+
+    // Grab DOM refs for in-place update during drag
+    const leftClipEl = this.captionContentEl.querySelector<HTMLElement>(
+      `[data-seg-id="${leftSeg.id}"]`
+    );
+    const rightClipEl = rightSeg
+      ? this.captionContentEl.querySelector<HTMLElement>(`[data-seg-id="${rightSeg.id}"]`)
+      : null;
+
+    const onMove = (ev: MouseEvent) => {
+      const dt = (ev.clientX - startX) / this.pxPerSec;
+      const minEnd = leftSeg.start + MIN_CAPTION_DUR;
+      const maxEnd = isRightEdge
+        ? Infinity
+        : Math.max(minEnd + MIN_CAPTION_DUR, rightSeg!.end - MIN_CAPTION_DUR);
+      const newEnd = Math.min(maxEnd, Math.max(minEnd, startEnd + dt));
+
+      leftSeg.end = newEnd;
+      if (!isRightEdge && rightSeg) rightSeg.start = newEnd;
+
+      // Update DOM in place (avoid full re-render during drag for smoothness)
+      if (leftClipEl) {
+        leftClipEl.style.width = Math.max(8, this._timeToPx(newEnd - leftSeg.start)) + 'px';
+      }
+      if (rightClipEl && rightSeg) {
+        rightClipEl.style.left = this._timeToPx(newEnd) + 'px';
+        rightClipEl.style.width = Math.max(8, this._timeToPx(rightSeg.end - newEnd)) + 'px';
+      }
+      borderEl.style.left = (this._timeToPx(newEnd) - 4) + 'px';
+
+      this._updateInnerWidth();
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      borderEl.classList.remove('dragging');
+      // Full re-render on release to sync all borders
+      this._renderCaptionTrack();
+      this._renderRuler();
+      this._updateInnerWidth();
+      this._notify();
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  private _selectCaption(id: string, idx: number): void {
+    this.selectedCaptionId = id;
+    this._updateCaptionSelectionStyles();
+    const seg = this.captionSegments[idx];
+    for (const cb of this.onCaptionClickCbs) cb(idx, seg.start);
+    for (const cb of this.onCaptionSelectChangeCbs) cb(idx);
+  }
+
+  /** Programmatically select a caption by index and scroll it into view. Does NOT fire onCaptionClick callbacks. */
+  selectCaption(idx: number): void {
+    const seg = this.captionSegments[idx];
+    if (!seg) return;
+    this.selectedCaptionId = seg.id;
+    this._updateCaptionSelectionStyles();
+    for (const cb of this.onCaptionSelectChangeCbs) cb(idx);
+    // Scroll the clip into view
+    const x = this._timeToPx(seg.start);
+    const viewW = this.scrollAreaEl.clientWidth;
+    if (x < this.scrollAreaEl.scrollLeft || x > this.scrollAreaEl.scrollLeft + viewW - 40) {
+      this.scrollAreaEl.scrollLeft = Math.max(0, x - viewW / 3);
+    }
+  }
+
+  private _updateCaptionSelectionStyles(): void {
+    this.captionContentEl.querySelectorAll<HTMLElement>('.tl-clip--caption').forEach(el => {
+      el.classList.toggle('selected', el.dataset.segId === this.selectedCaptionId);
+    });
+  }
+
+  // ── Caption data helpers ───────────────────────────────────────────────────
+
+  private _lyricsToSegments(lyrics: LyricLine[]): CaptionSegment[] {
+    const segs: CaptionSegment[] = [];
+    for (let i = 0; i < lyrics.length; i++) {
+      const start = lyrics[i].time / 1000;
+      const naturalEnd = (lyrics[i].time + lyrics[i].duration) / 1000;
+      // Seamless mode: extend end to next lyric's start (fills any LRC gap)
+      const end = i + 1 < lyrics.length ? lyrics[i + 1].time / 1000 : naturalEnd;
+      segs.push({ id: uid(), text: lyrics[i].text, start, end, source: 'lrc' });
+    }
+    return segs;
   }
 
   // ── Audio track render ─────────────────────────────────────────────────────
@@ -471,7 +918,7 @@ export class TimelineController {
 
   private _setupRulerClick(): void {
     this.rulerEl.addEventListener('click', e => {
-      const rect = this.rulerEl.getBoundingClientRect();
+      const rect = this.scrollAreaEl.getBoundingClientRect();
       const x = e.clientX - rect.left + this.scrollAreaEl.scrollLeft;
       this._seek(Math.max(0, this._pxToTime(x)));
     });
@@ -495,6 +942,19 @@ export class TimelineController {
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
       e.preventDefault();
+    });
+  }
+
+  // ── Keyboard ───────────────────────────────────────────────────────────────
+
+  private _setupKeyboard(): void {
+    document.addEventListener('keydown', e => {
+      // Skip if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'Delete' && this.selectedCaptionId) {
+        e.preventDefault();
+        this.deleteSelectedCaption();
+      }
     });
   }
 

@@ -55,6 +55,7 @@ const gspAlignGroup   = document.getElementById('gsp-align-group')   as HTMLDivE
 const timelineEl      = document.getElementById('timeline')          as HTMLDivElement;
 const tlMediaAdd      = document.getElementById('tl-media-add')      as HTMLButtonElement;
 const tlAudioAdd      = document.getElementById('tl-audio-add')      as HTMLButtonElement;
+const tlCaptionAdd    = document.getElementById('tl-caption-add')    as HTMLButtonElement;
 const tlMediaFile     = document.getElementById('tl-media-file')     as HTMLInputElement;
 const tlAudioFile     = document.getElementById('tl-audio-file')     as HTMLInputElement;
 
@@ -109,13 +110,26 @@ timeline.onCaptionClick((lineIdx, timeSec) => {
   scene.seek(timeSec);
   timeline.seekAudio(timeSec);
   timeline.syncPlayhead(timeSec);
-  lineEditor?.setSelected(lineIdx);
+  // Only set line editor selection for lines that exist in the scene
+  if (lineEditor && lineIdx < scene.getLyrics().length) {
+    lineEditor.setSelected(lineIdx);
+  }
   updateTransport();
 });
 
+// Update caption "+" button state when selection changes
+timeline.onCaptionSelectionChange(idx => {
+  const hasData = timeline.hasCaptionData();
+  tlCaptionAdd.disabled = idx === null && hasData;
+  tlCaptionAdd.title = idx === null && hasData ? '请先选中一条字幕' : '在选中字幕后插入';
+});
+
 timeline.onChange(() => {
-  // When timeline clips change, update the scene's total duration ref via seek bar
   updateTransport();
+  if (scene && lineEditor) {
+    scene.updateLyrics(timeline.getCaptionAsLyrics());
+    lineEditor.refresh();
+  }
 });
 
 // Media file input
@@ -132,6 +146,12 @@ tlAudioFile.addEventListener('change', async () => {
   if (!tlAudioFile.files?.length) return;
   await timeline.addAudioFiles(tlAudioFile.files);
   tlAudioFile.value = '';
+});
+
+// Caption insert button
+tlCaptionAdd.addEventListener('click', () => {
+  timeline.insertCaption();
+  updateTransport();
 });
 
 // Drag-drop setup
@@ -198,9 +218,16 @@ lrcFile.addEventListener('change', () => {
   const file = lrcFile.files?.[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => { lrcInput.value = e.target?.result as string ?? ''; };
+  reader.onload = e => {
+    lrcInput.value = e.target?.result as string ?? '';
+    // Clear timeline captions so next build re-parses from LRC
+    timeline.clearCaptionSegments();
+  };
   reader.readAsText(file, 'utf-8');
 });
+
+// Clear timeline captions when LRC text is manually edited
+lrcInput.addEventListener('input', () => timeline.clearCaptionSegments());
 
 // ── Random enable toggle ──────────────────────────────────────────────────────
 function syncSeedRowVisibility(): void { seedRow.hidden = !randomEnable.checked; }
@@ -233,7 +260,12 @@ buildBtn.addEventListener('click', () => {
   const raw = lrcInput.value.trim();
   if (!raw) { alert('请先输入或上传 LRC 歌词'); return; }
 
-  const lyrics = parseLrc(raw);
+  // Use existing timeline captions (may have been user-edited) when available,
+  // otherwise parse fresh from the LRC text.
+  let lyrics = timeline.hasCaptionData()
+    ? timeline.getCaptionAsLyrics()
+    : parseLrc(raw);
+
   if (lyrics.length === 0) { alert('未能解析到任何歌词行，请检查 LRC 格式'); return; }
 
   const cfg = buildConfig();
@@ -248,11 +280,35 @@ buildBtn.addEventListener('click', () => {
     return { element: clip.element, brightness: clip.brightness, contrast: clip.contrast, saturate: clip.saturate };
   });
 
+  // Wire timeline transition resolver
+  scene.setTransitionResolver(t => {
+    const trans = timeline.getTransitionAtTime(t);
+    if (!trans) return null;
+    return {
+      fromClip: {
+        element: trans.fromClip.element,
+        brightness: trans.fromClip.brightness,
+        contrast: trans.fromClip.contrast,
+        saturate: trans.fromClip.saturate,
+      },
+      toClip: {
+        element: trans.toClip.element,
+        brightness: trans.toClip.brightness,
+        contrast: trans.toClip.contrast,
+        saturate: trans.toClip.saturate,
+      },
+      progress: trans.progress,
+      type: trans.type,
+    };
+  });
+
   scene.build(lyrics, { seed: getSeed(), randomLayout: true, staticMode: !randomEnable.checked, overrides: prevOverrides });
   scene.seek(0);
 
-  // Populate caption track
-  timeline.setCaptionLyrics(lyrics);
+  // Populate caption track (only on first build or after clear; preserve user edits)
+  if (!timeline.hasCaptionData()) {
+    timeline.setCaptionLyrics(lyrics);
+  }
   timeline.syncPlayhead(0);
 
   updateTransport();
@@ -266,6 +322,11 @@ buildBtn.addEventListener('click', () => {
       timeline.seekAudio(t);
       timeline.syncPlayhead(t);
       updateTransport();
+    });
+    // Sync timeline selection when a lyric is selected in the right panel
+    lineEditor.onLineSelect((idx: number | null) => {
+      if (idx === null) return;
+      timeline.selectCaption(idx);
     });
   }
 

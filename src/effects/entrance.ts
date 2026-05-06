@@ -93,42 +93,6 @@ export function buildEntrance(
       break;
     }
 
-    case 'scatter': {
-      const spreadX  = params.spreadX  ?? 200;
-      const spreadY  = params.spreadY  ?? 150;
-      const duration = params.duration ?? 0.55;
-      for (let i = 0; i < n; i++) {
-        const c = chars[i];
-        c.x = c.baseX + rng.range(-spreadX, spreadX);
-        c.y = c.baseY + rng.range(-spreadY, spreadY);
-        tl.to(c, { x: c.baseX, y: c.baseY, alpha: 1, duration, ease: 'power3.out' }, at + rng.range(0, 0.2));
-      }
-      break;
-    }
-
-    case 'flipX': {
-      const duration = params.duration ?? 0.55;
-      const stagger  = params.stagger  ?? 0.05;
-      for (let i = 0; i < n; i++) {
-        const c = chars[i];
-        c.scaleX = 0;
-        tl.to(c, { scaleX: 1, alpha: 1, duration, ease: 'power2.out' }, at + i * stagger);
-      }
-      break;
-    }
-
-    case 'blurFade': {
-      const blurAmount = params.blurAmount ?? 20;
-      const duration   = params.duration   ?? 0.55;
-      const stagger    = params.stagger    ?? 0.04;
-      for (let i = 0; i < n; i++) {
-        const c = chars[i];
-        c.blur = blurAmount;
-        tl.to(c, { blur: 0, alpha: 1, duration, ease: 'power2.out' }, at + i * stagger);
-      }
-      break;
-    }
-
     case 'wave': {
       const waveHeight = params.waveHeight ?? 30;
       const duration   = params.duration   ?? 0.55;
@@ -183,6 +147,40 @@ export function buildEntrance(
             }, t0 + flashDur * 0.5);
           }
         }
+      }
+      break;
+    }
+
+    case 'flipIn': {
+      const duration   = params.duration   ?? 0.6;
+      const stagger    = params.stagger    ?? 0.06;
+      const elasticity = params.elasticity ?? 1.0;
+      for (let i = 0; i < n; i++) {
+        const c = chars[i];
+        c.scaleY = 0;
+        c.rotation = 90;
+        tl.to(c, {
+          scaleY: 1, rotation: 0, alpha: 1,
+          duration, ease: `elastic.out(${elasticity},0.5)`,
+        }, at + i * stagger);
+      }
+      break;
+    }
+
+    case 'converge': {
+      const spreadX  = params.spreadX  ?? 200;
+      const spreadY  = params.spreadY  ?? 150;
+      const duration = params.duration ?? 0.6;
+      for (let i = 0; i < n; i++) {
+        const c = chars[i];
+        c.x      = c.baseX + rng.range(-spreadX, spreadX);
+        c.y      = c.baseY + rng.range(-spreadY, spreadY);
+        c.scaleX = rng.range(0.3, 2);
+        c.scaleY = rng.range(0.3, 2);
+        tl.to(c, {
+          x: c.baseX, y: c.baseY, scaleX: 1, scaleY: 1, alpha: 1,
+          duration, ease: 'power3.out',
+        }, at + rng.range(0, 0.15));
       }
       break;
     }
