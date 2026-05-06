@@ -540,9 +540,17 @@ export class TimelineController {
       <div class="tl-trans-warn" hidden>时长已自动限制</div>
     `;
 
+    const durRow = el.querySelector<HTMLElement>('.tl-trans-dur')!;
+    const warnEl = el.querySelector<HTMLElement>('.tl-trans-warn')!;
+
     el.querySelectorAll<HTMLInputElement>('[name="tl-trans-type"]').forEach(radio => {
       radio.addEventListener('change', () => {
-        if (radio.checked) this._applyTransType(radio.value as 'none' | 'dissolve' | 'black_fade');
+        if (radio.checked) {
+          const hasDur = radio.value !== 'none';
+          durRow.hidden = !hasDur;
+          if (!hasDur) warnEl.hidden = true;
+          this._applyTransType(radio.value as 'none' | 'dissolve' | 'black_fade');
+        }
       });
     });
 
@@ -578,6 +586,8 @@ export class TimelineController {
     });
     const durInput = popover.querySelector<HTMLInputElement>('.tl-trans-dur-input')!;
     durInput.value = String(dur);
+    const hasDur = type !== 'none';
+    popover.querySelector<HTMLElement>('.tl-trans-dur')!.hidden = !hasDur;
     popover.querySelector<HTMLElement>('.tl-trans-warn')!.hidden = true;
 
     const rect = anchorEl.getBoundingClientRect();
