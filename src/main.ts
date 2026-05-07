@@ -28,6 +28,7 @@ const buildBtn        = document.getElementById('build-btn')         as HTMLButt
 const recBtn          = document.getElementById('rec-btn')            as HTMLButtonElement;
 const recTimer        = document.getElementById('rec-timer')          as HTMLSpanElement;
 const recIcon         = document.getElementById('rec-icon')           as HTMLSpanElement;
+const recLabel        = document.getElementById('rec-label')          as HTMLSpanElement;
 const mainCanvas      = document.getElementById('main-canvas')       as HTMLCanvasElement;
 const playPauseBtn    = document.getElementById('play-pause-btn')    as HTMLButtonElement;
 const seekBar         = document.getElementById('seek-bar')          as HTMLInputElement;
@@ -134,11 +135,6 @@ const _recMimeType = (() => {
   return 'video/webm';
 })();
 const _recExt = _recMimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
-
-function _initRecFormatLabel(): void {
-  if (recFormat) recFormat.textContent = `格式：${_recExt.toUpperCase()}`;
-}
-_initRecFormatLabel();
 
 // ── Timeline ──────────────────────────────────────────────────────────────────
 const timeline = new TimelineController(timelineEl);
@@ -459,7 +455,8 @@ function startRecording(): void {
   };
   mediaRecorder.start(100);
 
-  recBtn.textContent = '⏹ 停止录制';
+  recIcon.textContent = '⏹';
+  recLabel.textContent = ' 停止录制';
   recBtn.classList.add('recording');
   recTimer.hidden = false;
   recStartTime = Date.now();
@@ -473,7 +470,8 @@ function stopRecording(): void {
   mediaRecorder = null;
   clearInterval(recTimerInterval);
 
-  recBtn.textContent = '⏺ 开始录制';
+  recIcon.textContent = '⏺';
+  recLabel.textContent = ' 开始录制';
   recBtn.classList.remove('recording');
   recTimer.hidden = true;
 }
