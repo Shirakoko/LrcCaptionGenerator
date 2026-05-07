@@ -43,12 +43,21 @@ const rightPanelResize = document.getElementById('right-panel-resize') as HTMLEl
 const lineEditorList  = document.getElementById('line-editor-list')  as HTMLDivElement;
 const linePropsPanel  = document.getElementById('line-props-panel')  as HTMLDivElement;
 const fontSelect      = document.getElementById('font-select')       as HTMLSelectElement;
+const gspTab          = document.getElementById('gsp-tab')           as HTMLButtonElement;
 const globalStylePanel = document.getElementById('global-style-panel') as HTMLDivElement;
 const gspFont         = document.getElementById('gsp-font')          as HTMLSelectElement;
 const gspFillColor    = document.getElementById('gsp-fill-color')    as HTMLInputElement;
 const gspStrokeColor  = document.getElementById('gsp-stroke-color') as HTMLInputElement;
 const gspStrokeWidth  = document.getElementById('gsp-stroke-width') as HTMLInputElement;
 const gspStrokeWidthNum = document.getElementById('gsp-stroke-width-num') as HTMLInputElement;
+const gspFontSize     = document.getElementById('gsp-font-size')     as HTMLInputElement;
+const gspFontSizeNum  = document.getElementById('gsp-font-size-num') as HTMLInputElement;
+const gspLetterSpacing    = document.getElementById('gsp-letter-spacing')     as HTMLInputElement;
+const gspLetterSpacingNum = document.getElementById('gsp-letter-spacing-num') as HTMLInputElement;
+const gspPosX         = document.getElementById('gsp-pos-x')         as HTMLInputElement;
+const gspPosY         = document.getElementById('gsp-pos-y')         as HTMLInputElement;
+const gspRotation     = document.getElementById('gsp-rotation')      as HTMLInputElement;
+const gspRotationNum  = document.getElementById('gsp-rotation-num')  as HTMLInputElement;
 const gspApplyBtn     = document.getElementById('gsp-apply-btn')     as HTMLButtonElement;
 const gspAlignGroup   = document.getElementById('gsp-align-group')   as HTMLDivElement;
 // Timeline
@@ -73,6 +82,24 @@ FONTS.forEach(font => {
 });
 
 // ── Global style panel ────────────────────────────────────────────────────────
+
+// Tab toggle
+gspTab.addEventListener('click', () => {
+  const open = !globalStylePanel.hidden;
+  globalStylePanel.hidden = open;
+  gspTab.classList.toggle('active', !open);
+});
+
+// Close panel when clicking outside
+document.addEventListener('click', e => {
+  if (globalStylePanel.hidden) return;
+  const wrap = document.getElementById('gsp-tab-wrap')!;
+  if (!wrap.contains(e.target as Node)) {
+    globalStylePanel.hidden = true;
+    gspTab.classList.remove('active');
+  }
+});
+
 gspAlignGroup.addEventListener('click', e => {
   const btn = (e.target as HTMLElement).closest('.le-align-btn') as HTMLButtonElement | null;
   if (!btn) return;
@@ -80,11 +107,18 @@ gspAlignGroup.addEventListener('click', e => {
   btn.classList.add('active');
 });
 
-gspStrokeWidth.addEventListener('input', () => { gspStrokeWidthNum.value = gspStrokeWidth.value; });
-gspStrokeWidthNum.addEventListener('input', () => {
-  const v = Math.max(0, Math.min(16, parseFloat(gspStrokeWidthNum.value) || 0));
-  gspStrokeWidth.value = String(v);
-});
+// Sync slider ↔ number pairs
+function syncPair(slider: HTMLInputElement, num: HTMLInputElement, min: number, max: number) {
+  slider.addEventListener('input', () => { num.value = slider.value; });
+  num.addEventListener('input', () => {
+    const v = Math.max(min, Math.min(max, parseFloat(num.value) || 0));
+    slider.value = String(v);
+  });
+}
+syncPair(gspStrokeWidth, gspStrokeWidthNum, 0, 16);
+syncPair(gspFontSize, gspFontSizeNum, 24, 200);
+syncPair(gspLetterSpacing, gspLetterSpacingNum, -4, 32);
+syncPair(gspRotation, gspRotationNum, -180, 180);
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let scene: SceneController | null = null;
@@ -341,13 +375,13 @@ buildBtn.addEventListener('click', () => {
     });
   }
 
-  // Global style panel
-  globalStylePanel.hidden = false;
+  // Global style panel — sync initial values from left panel, enable tab
   gspFillColor.value = fillColor.value;
   gspStrokeColor.value = strokeColor.value;
   gspStrokeWidth.value = strokeWidthRange.value;
   gspStrokeWidthNum.value = strokeWidthRange.value;
   gspFont.value = fontSelect.value;
+  gspTab.disabled = false;
 
   // Canvas drag
   if (!canvasDrag) canvasDrag = new CanvasDrag(mainCanvas);
@@ -535,12 +569,23 @@ gspApplyBtn.addEventListener('click', () => {
   if (!scene) return;
   const activeAlignBtn = gspAlignGroup.querySelector<HTMLButtonElement>('.le-align-btn.active');
   const align = (activeAlignBtn?.dataset.val ?? 'center') as 'left' | 'center' | 'right';
+
+  const posXRaw = gspPosX.value.trim();
+  const posYRaw = gspPosY.value.trim();
+  const x = posXRaw !== '' ? parseFloat(posXRaw) : undefined;
+  const y = posYRaw !== '' ? parseFloat(posYRaw) : undefined;
+
   scene.applyStyleToAll({
     fontFamily: gspFont.value,
     align,
     fillColor: gspFillColor.value,
     strokeColor: gspStrokeColor.value,
     strokeWidth: parseFloat(gspStrokeWidth.value),
+    fontSize: parseFloat(gspFontSize.value),
+    letterSpacingExtra: parseFloat(gspLetterSpacing.value),
+    x,
+    y,
+    rotation: parseFloat(gspRotation.value),
   });
   lineEditor?.refresh();
 });

@@ -114,6 +114,9 @@ export class TimelineController {
   private transPopoverEl: HTMLElement | null = null;
   private transPopoverClipId: string | null = null;
 
+  // Selected media clip
+  private selectedMediaId: string | null = null;
+
   // DOM refs
   private scrollAreaEl: HTMLElement;
   private innerEl: HTMLElement;
@@ -489,6 +492,7 @@ export class TimelineController {
     el.dataset.clipId = clip.id;
     el.style.left = this._timeToPx(clip.startTime) + 'px';
     el.style.width = Math.max(8, this._timeToPx(clip.duration)) + 'px';
+    if (this.selectedMediaId === clip.id) el.classList.add('tl-clip--selected');
 
     const thumb = document.createElement('img');
     thumb.className = 'tl-clip-thumb';
@@ -507,11 +511,97 @@ export class TimelineController {
 
     el.append(thumb, name, dur, resizeHandle);
 
-    el.addEventListener('contextmenu', e => {
-      e.preventDefault();
-      if (confirm(`删除 "${clip.file.name}"？`)) this.removeMediaClip(clip.id);
+    // ── Click to select ──────────────────────────────────────────────────────
+    el.addEventListener('mousedown', e => {
+      if ((e.target as HTMLElement).closest('.tl-clip-resize')) return;
+      this.selectedMediaId = clip.id;
+      this._renderMediaTrack();
     });
 
+    // ── Drag to reorder ──────────────────────────────────────────────────────
+    el.addEventListener('mousedown', e => {
+      if ((e.target as HTMLElement).closest('.tl-clip-resize')) return;
+      e.preventDefault();
+
+      const startX = e.clientX;
+      let dragging = false;
+      let ghost: HTMLElement | null = null;
+      let insertIdx = this.mediaClips.findIndex(c => c.id === clip.id);
+
+      const onMove = (ev: MouseEvent) => {
+        const dx = ev.clientX - startX;
+        if (!dragging && Math.abs(dx) < 5) return;
+
+        if (!dragging) {
+          dragging = true;
+          el.classList.add('tl-clip--dragging');
+
+          // Create ghost indicator
+          ghost = document.createElement('div');
+          ghost.className = 'tl-clip-drag-ghost';
+          ghost.style.width = el.style.width;
+          ghost.style.height = el.offsetHeight + 'px';
+          this.mediaContentEl.appendChild(ghost);
+        }
+
+        // Move ghost to cursor position (relative to track)
+        const trackRect = this.mediaContentEl.getBoundingClientRect();
+        const scrollLeft = this.scrollAreaEl.scrollLeft;
+        const ghostX = ev.clientX - trackRect.left + scrollLeft - el.offsetWidth / 2;
+        ghost!.style.left = Math.max(0, ghostX) + 'px';
+
+        // Determine insert position by comparing ghost center to clip centers
+        const ghostCenter = ghostX + el.offsetWidth / 2;
+        let newIdx = 0;
+        for (let i = 0; i < this.mediaClips.length; i++) {
+          const c = this.mediaClips[i];
+          if (c.id === clip.id) continue;
+          const cCenter = this._timeToPx(c.startTime + c.duration / 2);
+          if (ghostCenter > cCenter) newIdx = i + 1;
+        }
+        // Adjust for the fact that the dragged clip is still in the array
+        const origIdx = this.mediaClips.findIndex(c => c.id === clip.id);
+        if (newIdx > origIdx) newIdx--;
+        insertIdx = newIdx;
+
+        // Highlight drop position
+        this.mediaContentEl.querySelectorAll('.tl-clip--drop-target').forEach(
+          el => el.classList.remove('tl-clip--drop-target')
+        );
+        const targetEl = this.mediaContentEl.querySelectorAll<HTMLElement>('.tl-clip--media:not(.tl-clip--dragging)')[insertIdx];
+        targetEl?.classList.add('tl-clip--drop-target');
+      };
+
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+
+        if (dragging) {
+          el.classList.remove('tl-clip--dragging');
+          ghost?.remove();
+          this.mediaContentEl.querySelectorAll('.tl-clip--drop-target').forEach(
+            el => el.classList.remove('tl-clip--drop-target')
+          );
+
+          // Reorder array
+          const origIdx = this.mediaClips.findIndex(c => c.id === clip.id);
+          if (origIdx !== insertIdx) {
+            const [moved] = this.mediaClips.splice(origIdx, 1);
+            this.mediaClips.splice(insertIdx, 0, moved);
+            this._repackMedia();
+            this._renderMediaTrack();
+            this._renderRuler();
+            this._updateInnerWidth();
+            this._notify();
+          }
+        }
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // ── Resize handle ────────────────────────────────────────────────────────
     resizeHandle.addEventListener('mousedown', e => {
       e.stopPropagation();
       const startX = e.clientX;
@@ -1032,9 +1122,14 @@ export class TimelineController {
     document.addEventListener('keydown', e => {
       // Skip if typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'Delete' && this.selectedCaptionId) {
+      if (e.key === 'Delete') {
         e.preventDefault();
-        this.deleteSelectedCaption();
+        if (this.selectedMediaId) {
+          this.removeMediaClip(this.selectedMediaId);
+          this.selectedMediaId = null;
+        } else if (this.selectedCaptionId) {
+          this.deleteSelectedCaption();
+        }
       }
     });
   }

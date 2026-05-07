@@ -100,13 +100,10 @@
           </section>
         </aside>
 
-        <!-- 预览区 -->
-        <main id="preview-area">
-          <div id="line-props-panel" hidden></div>
-
-          <!-- 全局样式面板 -->
+        <!-- 全局样式页签 + 滑出面板 -->
+        <div id="gsp-tab-wrap">
+          <button id="gsp-tab" type="button" title="全局样式">全局样式</button>
           <div id="global-style-panel" hidden>
-            <div class="gsp-title">全局样式</div>
             <div class="le-row">
               <label class="le-label">字体</label>
               <select id="gsp-font" class="le-select"></select>
@@ -131,8 +128,38 @@
               <input id="gsp-stroke-width-num" type="number" class="le-num" min="0" max="16" step="0.5" value="0" />
               <span class="le-unit">px</span>
             </div>
+            <div class="le-row">
+              <label class="le-label">字号</label>
+              <input id="gsp-font-size" type="range" class="le-slider" min="24" max="200" step="1" value="72" />
+              <input id="gsp-font-size-num" type="number" class="le-num" min="24" max="200" step="1" value="72" />
+              <span class="le-unit">px</span>
+            </div>
+            <div class="le-row">
+              <label class="le-label">字间距</label>
+              <input id="gsp-letter-spacing" type="range" class="le-slider" min="-4" max="32" step="0.5" value="0" />
+              <input id="gsp-letter-spacing-num" type="number" class="le-num" min="-4" max="32" step="0.5" value="0" />
+              <span class="le-unit">px</span>
+            </div>
+            <div class="le-row">
+              <label class="le-label">位置</label>
+              <label class="le-label-sm">X</label>
+              <input id="gsp-pos-x" type="number" class="le-num le-num--wide" step="1" placeholder="—" />
+              <label class="le-label-sm" style="margin-left:6px;">Y</label>
+              <input id="gsp-pos-y" type="number" class="le-num le-num--wide" step="1" placeholder="—" />
+            </div>
+            <div class="le-row">
+              <label class="le-label">旋转</label>
+              <input id="gsp-rotation" type="range" class="le-slider" min="-180" max="180" step="1" value="0" />
+              <input id="gsp-rotation-num" type="number" class="le-num" min="-180" max="180" step="1" value="0" />
+              <span class="le-unit">°</span>
+            </div>
             <button id="gsp-apply-btn" type="button" class="primary" style="margin-top:2px;">应用于所有字幕</button>
           </div>
+        </div>
+
+        <!-- 预览区 -->
+        <main id="preview-area">
+          <div id="line-props-panel" hidden></div>
 
           <div id="canvas-wrap">
             <canvas id="main-canvas"></canvas>

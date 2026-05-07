@@ -209,13 +209,27 @@ export class SceneController {
     fillColor: string;
     strokeColor: string;
     strokeWidth: number;
+    fontSize?: number;
+    letterSpacingExtra?: number;
+    x?: number;
+    y?: number;
+    rotation?: number;
   }): void {
     const prevTime = this.currentTime;
     for (let i = 0; i < this.lyrics.length; i++) {
       const existing = this.overrideMap[i] ?? {};
+      const layoutPatch: Record<string, unknown> = {
+        fontFamily: style.fontFamily,
+        align: style.align,
+      };
+      if (style.fontSize !== undefined)          layoutPatch.fontSize = style.fontSize;
+      if (style.letterSpacingExtra !== undefined) layoutPatch.letterSpacingExtra = style.letterSpacingExtra;
+      if (style.x !== undefined)                 layoutPatch.x = style.x;
+      if (style.y !== undefined)                 layoutPatch.y = style.y;
+      if (style.rotation !== undefined)          layoutPatch.rotation = style.rotation;
       this.overrideMap[i] = {
         ...existing,
-        layout: { ...existing.layout, fontFamily: style.fontFamily, align: style.align },
+        layout: { ...existing.layout, ...layoutPatch },
         fillColor: style.fillColor,
         strokeColor: style.strokeColor,
         strokeWidth: style.strokeWidth,
