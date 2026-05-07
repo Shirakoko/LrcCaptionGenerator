@@ -540,6 +540,18 @@ progress { width: 100%; height: 6px; border-radius: 3px; }
   gap: 6px;
 }
 
+.le-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 6px 0;
+}
+
+.le-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 6px 0;
+}
+
 .le-label {
   font-size: 11px;
   color: var(--text-dim);

@@ -205,10 +205,9 @@ export class LineEditorUI {
     const layoutSec = this._section('布局', [
       this._fontRow(savedOverride?.layout?.fontFamily ?? cfg.fontFamily),
       this._alignRow(layout.align),
-      this._sliderRow('位置 X',  'x',                 layout.x,             0, this.canvasWidth,  1,   'px'),
-      this._sliderRow('位置 Y',  'y',                 layout.y,             0, this.canvasHeight, 1,   'px'),
       this._sliderRow('字号',    'fontSize',           layout.fontSize,      24, 200,              1,   'px'),
       this._sliderRow('字间距',  'letterSpacingExtra', layout.letterSpacing, -4, 16,               0.5, 'px'),
+      this._posRow(layout.x, layout.y, this.canvasWidth, this.canvasHeight),
       this._sliderRow('旋转',    'rotation',           layout.rotation,     -20, 20,               0.5, '°'),
     ]);
     this.propsPanel.appendChild(layoutSec);
@@ -476,6 +475,72 @@ export class LineEditorUI {
     });
 
     row.append(lbl, group);
+    return row;
+  }
+
+  // ── Position row (X and Y on one line) ──────────────────────────────────────
+
+  private _posRow(xVal: number, yVal: number, maxX: number, maxY: number): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'le-row';
+
+    const lbl = document.createElement('label');
+    lbl.className = 'le-label';
+    lbl.textContent = '位置';
+
+    const xLbl = document.createElement('label');
+    xLbl.className = 'le-label-sm';
+    xLbl.textContent = 'X';
+
+    const xNum = document.createElement('input');
+    xNum.type = 'number';
+    xNum.className = 'le-num le-num--wide';
+    xNum.dataset.key = 'x';
+    xNum.min = '0';
+    xNum.max = String(maxX);
+    xNum.step = '1';
+    xNum.value = String(Math.round(xVal));
+
+    // hidden range slider so _collectOverride can still read it via input[type="range"][data-key="x"]
+    const xSlider = document.createElement('input');
+    xSlider.type = 'range';
+    xSlider.className = 'le-slider';
+    xSlider.dataset.key = 'x';
+    xSlider.min = '0';
+    xSlider.max = String(maxX);
+    xSlider.step = '1';
+    xSlider.value = String(Math.round(xVal));
+    xSlider.style.display = 'none';
+
+    const yLbl = document.createElement('label');
+    yLbl.className = 'le-label-sm';
+    yLbl.style.marginLeft = '6px';
+    yLbl.textContent = 'Y';
+
+    const yNum = document.createElement('input');
+    yNum.type = 'number';
+    yNum.className = 'le-num le-num--wide';
+    yNum.dataset.key = 'y';
+    yNum.min = '0';
+    yNum.max = String(maxY);
+    yNum.step = '1';
+    yNum.value = String(Math.round(yVal));
+
+    const ySlider = document.createElement('input');
+    ySlider.type = 'range';
+    ySlider.className = 'le-slider';
+    ySlider.dataset.key = 'y';
+    ySlider.min = '0';
+    ySlider.max = String(maxY);
+    ySlider.step = '1';
+    ySlider.value = String(Math.round(yVal));
+    ySlider.style.display = 'none';
+
+    // keep hidden sliders in sync so _collectOverride reads correct values
+    xNum.addEventListener('input', () => { xSlider.value = xNum.value; });
+    yNum.addEventListener('input', () => { ySlider.value = yNum.value; });
+
+    row.append(lbl, xLbl, xNum, xSlider, yLbl, yNum, ySlider);
     return row;
   }
 
