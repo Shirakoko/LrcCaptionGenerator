@@ -77,25 +77,10 @@
           </section>
 
           <section class="panel-section">
-            <label>导出</label>
+            <label>录制 <span id="rec-format" style="font-size:11px; color:var(--text-muted, #888); font-weight:normal;"></span></label>
             <div class="row">
-              <label class="checkbox-label">
-                <input id="export-transparent" type="checkbox" checked />
-                透明背景（仅文字）
-              </label>
-            </div>
-            <div class="row">
-              <button id="export-png-btn" type="button">PNG 帧</button>
-              <button id="export-webm-btn" type="button">WebM 视频</button>
-              <button id="export-mov-btn" type="button">MOV 视频</button>
-            </div>
-            <div id="export-progress" hidden>
-              <progress id="export-bar" max="100" value="0"></progress>
-              <span id="export-label">0%</span>
-              <button id="export-cancel-btn" type="button">中断</button>
-            </div>
-            <div id="export-mov-note" hidden>
-              <span>正在加载 ffmpeg.wasm (~30MB)…</span>
+              <button id="rec-btn" type="button" disabled><span class="rec-icon">⏺</span> 开始录制</button>
+              <span id="rec-timer" hidden style="margin-left:8px; font-variant-numeric:tabular-nums;">00:00</span>
             </div>
           </section>
         </aside>

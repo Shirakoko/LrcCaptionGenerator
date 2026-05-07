@@ -70,6 +70,7 @@ export const PIXEL_FX_COLOR_PARAMS: Partial<Record<PixelFxName, Array<{ key: str
 
 
 export const ENTRANCE_PARAMS: Record<EntranceName, ParamDef[]> = {
+  none: [],
   typewriter: [
     { key: 'charDur',   label: '出现时长', min: 0.02, max: 0.15, step: 0.01, unit: 's', default: 0.06 },
     { key: 'charDelay', label: '字符间隔', min: 0.02, max: 0.20, step: 0.01, unit: 's', default: 0.08 },
@@ -106,6 +107,18 @@ export const ENTRANCE_PARAMS: Record<EntranceName, ParamDef[]> = {
     { key: 'spreadX',  label: '水平散布', min: 50,  max: 400, step: 10,   unit: 'px', default: 200 },
     { key: 'spreadY',  label: '垂直散布', min: 50,  max: 300, step: 10,   unit: 'px', default: 150 },
     { key: 'duration', label: '动画时长', min: 0.2, max: 1.5, step: 0.05, unit: 's',  default: 0.6 },
+  ],
+  elasticBounce: [
+    { key: 'dropHeight', label: '下落高度', min: 20,  max: 200, step: 10,   unit: 'px', default: 60  },
+    { key: 'duration',   label: '动画时长', min: 0.3, max: 1.5, step: 0.05, unit: 's',  default: 0.7 },
+    { key: 'stagger',    label: '字符错位', min: 0,   max: 0.15, step: 0.01, unit: 's', default: 0.06 },
+    { key: 'elasticity', label: '弹性强度', min: 0.3, max: 3.0, step: 0.1,  unit: '',   default: 1.2 },
+  ],
+  staggerDrop: [
+    { key: 'maxHeight', label: '最大高度', min: 20,  max: 200, step: 10,   unit: 'px', default: 80  },
+    { key: 'spreadX',   label: '水平散布', min: 0,   max: 80,  step: 5,    unit: 'px', default: 30  },
+    { key: 'duration',  label: '动画时长', min: 0.2, max: 1.2, step: 0.05, unit: 's',  default: 0.5 },
+    { key: 'maxDelay',  label: '最大延迟', min: 0,   max: 0.6, step: 0.05, unit: 's',  default: 0.3 },
   ],
 };
 
@@ -150,6 +163,7 @@ export const IDLE_PARAMS: Record<IdleName, ParamDef[]> = {
 // ── Exit params ───────────────────────────────────────────────────────────────
 
 export const EXIT_PARAMS: Record<ExitName, ParamDef[]> = {
+  none: [],
   fadeOut: [
     { key: 'duration', label: '淡出时长', min: 0.1, max: 1.5, step: 0.05, unit: 's', default: 0.45 },
   ],
@@ -183,5 +197,10 @@ export const EXIT_PARAMS: Record<ExitName, ParamDef[]> = {
   ],
   squash: [
     { key: 'duration', label: '压扁时长', min: 0.1, max: 1.0, step: 0.05, unit: 's', default: 0.35 },
+  ],
+  particleFall: [
+    { key: 'fallDistance', label: '下落距离', min: 40,  max: 300, step: 10,   unit: 'px', default: 120 },
+    { key: 'spread',       label: '水平散布', min: 0,   max: 100, step: 5,    unit: 'px', default: 40  },
+    { key: 'duration',     label: '动画时长', min: 0.2, max: 1.5, step: 0.05, unit: 's',  default: 0.6 },
   ],
 };

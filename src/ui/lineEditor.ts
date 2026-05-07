@@ -17,20 +17,23 @@ function fmtTime(ms: number): string {
 }
 
 const ENTRANCE_LABELS: Record<EntranceName, string> = {
+  none: '无',
   typewriter: '打字机', slideLeft: '左滑入', slideRight: '右滑入',
   slideUp: '下滑入', slideDown: '上滑入', scalePop: '弹出',
   wave: '波浪', fadeIn: '淡入', glitch: '故障闪烁',
   flipIn: '垂直翻转', converge: '四面飞来',
+  elasticBounce: '弹性入场', staggerDrop: '错落布局',
 };
 const IDLE_LABELS: Record<IdleName, string> = {
+  none: '无',
   float: '浮动', charJitter: '字符抖动', breathe: '呼吸', altFloat: '交错浮动',
   ripple: '水波纹', flicker: '明暗闪烁', invertFlicker: '反色闪烁', sway: '左右摇晃',
-  none: '无',
 };
 const EXIT_LABELS: Record<ExitName, string> = {
+  none: '无',
   fadeOut: '淡出', floatUp: '上飘', floatDown: '下落',
   explode: '爆炸', shrink: '收缩', afterimage: '残影', blurOut: '模糊淡出',
-  squash: '压扁消失',
+  squash: '压扁消失', particleFall: '下落粒子',
 };
 
 export class LineEditorUI {

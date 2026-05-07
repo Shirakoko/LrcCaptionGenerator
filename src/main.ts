@@ -25,15 +25,9 @@ const strokeWidthRange = document.getElementById('stroke-width')     as HTMLInpu
 const strokeWidthVal  = document.getElementById('stroke-width-val')  as HTMLSpanElement;
 const strokeColor     = document.getElementById('stroke-color')      as HTMLInputElement;
 const buildBtn        = document.getElementById('build-btn')         as HTMLButtonElement;
-const exportPngBtn    = document.getElementById('export-png-btn')    as HTMLButtonElement;
-const exportWebmBtn   = document.getElementById('export-webm-btn')   as HTMLButtonElement;
-const exportMovBtn    = document.getElementById('export-mov-btn')    as HTMLButtonElement;
-const exportTransparent = document.getElementById('export-transparent') as HTMLInputElement;
-const exportProgress  = document.getElementById('export-progress')   as HTMLDivElement;
-const exportBar       = document.getElementById('export-bar')        as HTMLProgressElement;
-const exportLabel     = document.getElementById('export-label')      as HTMLSpanElement;
-const exportCancelBtn = document.getElementById('export-cancel-btn') as HTMLButtonElement;
-const exportMovNote   = document.getElementById('export-mov-note')   as HTMLDivElement;
+const recBtn          = document.getElementById('rec-btn')            as HTMLButtonElement;
+const recTimer        = document.getElementById('rec-timer')          as HTMLSpanElement;
+const recIcon         = document.getElementById('rec-icon')           as HTMLSpanElement;
 const mainCanvas      = document.getElementById('main-canvas')       as HTMLCanvasElement;
 const playPauseBtn    = document.getElementById('play-pause-btn')    as HTMLButtonElement;
 const seekBar         = document.getElementById('seek-bar')          as HTMLInputElement;
@@ -125,8 +119,26 @@ let scene: SceneController | null = null;
 let lineEditor: LineEditorUI | null = null;
 let canvasDrag: CanvasDrag | null = null;
 let seekRafId = 0;
-let isExporting = false;
-let exportCancelled = false;
+
+// ── Recording state ───────────────────────────────────────────────────────────
+let mediaRecorder: MediaRecorder | null = null;
+let recChunks: Blob[] = [];
+let recStream: MediaStream | null = null;
+let recTimerInterval = 0;
+let recStartTime = 0;
+
+// Detect best supported codec once at startup
+const _recMimeType = (() => {
+  if (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1')) return 'video/mp4;codecs=avc1';
+  if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) return 'video/webm;codecs=vp9';
+  return 'video/webm';
+})();
+const _recExt = _recMimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+
+function _initRecFormatLabel(): void {
+  if (recFormat) recFormat.textContent = `格式：${_recExt.toUpperCase()}`;
+}
+_initRecFormatLabel();
 
 // ── Timeline ──────────────────────────────────────────────────────────────────
 const timeline = new TimelineController(timelineEl);
@@ -285,10 +297,11 @@ bgColor.addEventListener('input', () => {
 
 // ── Build ─────────────────────────────────────────────────────────────────────
 buildBtn.addEventListener('click', () => {
-  if (isExporting) {
-    const ok = confirm('当前正在渲染视频，是否中断并重新生成预览？');
+  // If currently recording, stop first
+  if (mediaRecorder?.state === 'recording') {
+    const ok = confirm('当前正在录制视频，是否停止录制并重新生成预览？');
     if (!ok) return;
-    exportCancelled = true;
+    stopRecording();
   }
 
   const raw = lrcInput.value.trim();
@@ -382,6 +395,8 @@ buildBtn.addEventListener('click', () => {
   gspStrokeWidthNum.value = strokeWidthRange.value;
   gspFont.value = fontSelect.value;
   gspTab.disabled = false;
+  recBtn.disabled = false;
+  recBtn.disabled = false;
 
   // Canvas drag
   if (!canvasDrag) canvasDrag = new CanvasDrag(mainCanvas);
@@ -414,155 +429,62 @@ seekBar.addEventListener('input', () => {
   updateTransport();
 });
 
-// ── Export helpers ────────────────────────────────────────────────────────────
-function isTransparent(): boolean { return exportTransparent.checked; }
+// ── Recording ─────────────────────────────────────────────────────────────────
 
-async function renderToWebmBlob(fps: number): Promise<Blob> {
-  const dur = scene!.duration;
-  const totalFrames = Math.ceil(dur * fps);
-  const frameInterval = 1 / fps;
-
-  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-    ? 'video/webm;codecs=vp9'
-    : 'video/webm';
-
-  const chunks: Blob[] = [];
-  const stream = mainCanvas.captureStream(fps);
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
-  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-  const done = new Promise<void>(resolve => { recorder.onstop = () => resolve(); });
-
-  const prevTransparent = scene!.transparentBg;
-  scene!.transparentBg = isTransparent();
-
-  recorder.start();
-  for (let i = 0; i <= totalFrames; i++) {
-    if (exportCancelled) break;
-    const t = Math.min(i * frameInterval, dur);
-    scene!.seek(t);
-    await new Promise<void>(r => requestAnimationFrame(() => r()));
-    const pct = Math.round((i / totalFrames) * 100);
-    exportBar.value = pct;
-    exportLabel.textContent = `${pct}%`;
-  }
-  recorder.stop();
-  await done;
-
-  scene!.transparentBg = prevTransparent;
-  scene!.seek(scene!.currentTime);
-  return new Blob(chunks, { type: mimeType });
+function _updateRecTimer(): void {
+  const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
+  const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+  recTimer.textContent = `${m}:${s}`;
 }
 
-function setExportBusy(busy: boolean): void {
-  isExporting = busy;
-  if (!busy) exportCancelled = false;
-  exportProgress.hidden = !busy;
-  exportWebmBtn.disabled = busy;
-  exportMovBtn.disabled = busy;
-  exportPngBtn.disabled = busy;
-  seekBar.disabled = busy;
-  playPauseBtn.disabled = busy;
-}
-
-// ── Export PNG ────────────────────────────────────────────────────────────────
-exportPngBtn.addEventListener('click', () => {
-  if (!scene) { alert('请先生成预览'); return; }
-  const prev = scene.transparentBg;
-  scene.transparentBg = isTransparent();
-  scene.seek(scene.currentTime);
-  const url = scene.exportFramePng();
-  scene.transparentBg = prev;
-  scene.seek(scene.currentTime);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `caption_${Date.now()}.png`;
-  a.click();
-});
-
-// ── Export WebM ───────────────────────────────────────────────────────────────
-exportWebmBtn.addEventListener('click', async () => {
-  if (!scene) { alert('请先生成预览'); return; }
-  if (scene.duration <= 0) { alert('时长为 0，无法导出'); return; }
-
-  setExportBusy(true);
-  try {
-    const blob = await renderToWebmBlob(30);
-    if (exportCancelled) return;
+function startRecording(): void {
+  if (!scene) return;
+  recChunks = [];
+  recStream = mainCanvas.captureStream(30);
+  mediaRecorder = new MediaRecorder(recStream, {
+    mimeType: _recMimeType,
+    videoBitsPerSecond: 8_000_000,
+  });
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recChunks, { type: _recMimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `caption_${Date.now()}.webm`;
+    a.download = `caption_${Date.now()}.${_recExt}`;
     a.click();
     URL.revokeObjectURL(url);
-  } finally {
-    setExportBusy(false);
+    recChunks = [];
+  };
+  mediaRecorder.start(100);
+
+  recBtn.textContent = '⏹ 停止录制';
+  recBtn.classList.add('recording');
+  recTimer.hidden = false;
+  recStartTime = Date.now();
+  recTimerInterval = window.setInterval(_updateRecTimer, 500);
+}
+
+function stopRecording(): void {
+  mediaRecorder?.stop();
+  recStream?.getTracks().forEach(t => t.stop());
+  recStream = null;
+  mediaRecorder = null;
+  clearInterval(recTimerInterval);
+
+  recBtn.textContent = '⏺ 开始录制';
+  recBtn.classList.remove('recording');
+  recTimer.hidden = true;
+}
+
+recBtn.addEventListener('click', () => {
+  if (mediaRecorder?.state === 'recording') {
+    stopRecording();
+  } else {
+    startRecording();
   }
 });
-
-// ── Export MOV ────────────────────────────────────────────────────────────────
-exportMovBtn.addEventListener('click', async () => {
-  if (!scene) { alert('请先生成预览'); return; }
-  if (scene.duration <= 0) { alert('时长为 0，无法导出'); return; }
-
-  setExportBusy(true);
-  exportMovNote.hidden = false;
-  exportLabel.textContent = '加载 ffmpeg…';
-
-  try {
-    const { FFmpeg } = await import('@ffmpeg/ffmpeg');
-    const { fetchFile, toBlobURL } = await import('@ffmpeg/util');
-
-    const ffmpeg = new FFmpeg();
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
-
-    exportMovNote.hidden = true;
-    exportLabel.textContent = '渲染帧…';
-
-    const webmBlob = await renderToWebmBlob(30);
-    if (exportCancelled) return;
-    const webmData = await fetchFile(webmBlob);
-    await ffmpeg.writeFile('input.webm', webmData);
-
-    exportLabel.textContent = '转换 MOV…';
-    exportBar.value = 99;
-
-    await ffmpeg.exec([
-      '-i', 'input.webm',
-      '-c:v', 'prores_ks',
-      '-profile:v', '4444',
-      '-pix_fmt', 'yuva444p10le',
-      '-vendor', 'apl0',
-      'output.mov',
-    ]);
-
-    const movData = await ffmpeg.readFile('output.mov');
-    const movBytes = movData instanceof Uint8Array
-      ? movData.buffer.slice(0) as ArrayBuffer
-      : (movData as unknown as ArrayBuffer);
-    const movBlob = new Blob([movBytes], { type: 'video/quicktime' });
-    const url = URL.createObjectURL(movBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `caption_${Date.now()}.mov`;
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error(err);
-    if (!exportCancelled) {
-      alert('MOV 导出失败，请查看控制台。\n提示：部分浏览器需要 HTTPS 才能使用 ffmpeg.wasm。');
-    }
-  } finally {
-    setExportBusy(false);
-    exportMovNote.hidden = true;
-  }
-});
-
-// ── Export cancel ─────────────────────────────────────────────────────────────
-exportCancelBtn.addEventListener('click', () => { exportCancelled = true; });
 
 // ── Global style apply ────────────────────────────────────────────────────────
 gspApplyBtn.addEventListener('click', () => {

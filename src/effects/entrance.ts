@@ -17,6 +17,12 @@ export function buildEntrance(
   const n = chars.length;
   if (n === 0) return;
 
+  // 'none': characters are already visible (alpha=1 by default), nothing to do
+  if (name === 'none') {
+    for (const c of chars) c.alpha = 1;
+    return;
+  }
+
   for (const c of chars) c.alpha = 0;
 
   switch (name) {
@@ -181,6 +187,43 @@ export function buildEntrance(
           x: c.baseX, y: c.baseY, scaleX: 1, scaleY: 1, alpha: 1,
           duration, ease: 'power3.out',
         }, at + rng.range(0, 0.15));
+      }
+      break;
+    }
+
+    case 'elasticBounce': {
+      // Each character drops from above and bounces into place with elastic ease
+      const dropHeight = params.dropHeight ?? 60;
+      const duration   = params.duration   ?? 0.7;
+      const stagger    = params.stagger    ?? 0.06;
+      const elasticity = params.elasticity ?? 1.2;
+      for (let i = 0; i < n; i++) {
+        const c = chars[i];
+        c.y      = c.baseY - dropHeight;
+        c.scaleX = 0.6;
+        c.scaleY = 0.6;
+        tl.to(c, {
+          y: c.baseY, scaleX: 1, scaleY: 1, alpha: 1,
+          duration, ease: `elastic.out(${elasticity},0.4)`,
+        }, at + i * stagger);
+      }
+      break;
+    }
+
+    case 'staggerDrop': {
+      // Characters fall in from random heights with staggered, irregular delays
+      const maxHeight = params.maxHeight ?? 80;
+      const spreadX   = params.spreadX   ?? 30;
+      const duration  = params.duration  ?? 0.5;
+      const maxDelay  = params.maxDelay  ?? 0.3;
+      for (let i = 0; i < n; i++) {
+        const c = chars[i];
+        c.y = c.baseY - rng.range(maxHeight * 0.4, maxHeight);
+        c.x = c.baseX + rng.range(-spreadX, spreadX);
+        tl.to(c, {
+          x: c.baseX, y: c.baseY, alpha: 1,
+          duration, ease: 'power3.out',
+        }, at + rng.range(0, maxDelay));
       }
       break;
     }

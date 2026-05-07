@@ -73,6 +73,7 @@ export interface LineState {
 }
 
 export type EntranceName =
+  | 'none'
   | 'typewriter'
   | 'slideLeft'
   | 'slideRight'
@@ -83,7 +84,9 @@ export type EntranceName =
   | 'fadeIn'
   | 'glitch'
   | 'flipIn'
-  | 'converge';
+  | 'converge'
+  | 'elasticBounce'
+  | 'staggerDrop';
 
 export type IdleName =
   | 'float'
@@ -97,6 +100,7 @@ export type IdleName =
   | 'none';
 
 export type ExitName =
+  | 'none'
   | 'fadeOut'
   | 'floatUp'
   | 'floatDown'
@@ -104,7 +108,8 @@ export type ExitName =
   | 'shrink'
   | 'afterimage'
   | 'blurOut'
-  | 'squash';
+  | 'squash'
+  | 'particleFall';
 
 export interface EffectSet {
   entrance: EntranceName;
@@ -112,13 +117,23 @@ export interface EffectSet {
   exit: ExitName;
 }
 
+// All entrance names in UI order (none first)
 export const ENTRANCES: EntranceName[] = [
+  'none',
   'typewriter', 'slideLeft', 'slideRight', 'slideUp', 'slideDown',
   'scalePop', 'wave', 'fadeIn', 'glitch',
-  'flipIn', 'converge',
+  'flipIn', 'converge', 'elasticBounce', 'staggerDrop',
 ];
-export const IDLES: IdleName[] = ['float', 'charJitter', 'breathe', 'altFloat', 'ripple', 'flicker', 'invertFlicker', 'sway', 'none'];
-export const EXITS: ExitName[] = ['fadeOut', 'floatUp', 'floatDown', 'explode', 'shrink', 'afterimage', 'blurOut', 'squash'];
+export const IDLES: IdleName[] = ['none', 'float', 'charJitter', 'breathe', 'altFloat', 'ripple', 'flicker', 'invertFlicker', 'sway'];
+export const EXITS: ExitName[] = [
+  'none',
+  'fadeOut', 'floatUp', 'floatDown', 'explode', 'shrink', 'afterimage', 'blurOut', 'squash', 'particleFall',
+];
+
+// Pools used by random picker — exclude 'none' so random builds always have visible effects
+const _ENTRANCES_RAND: EntranceName[] = ENTRANCES.filter(e => e !== 'none');
+const _IDLES_RAND: IdleName[]         = IDLES.filter(e => e !== 'none');
+const _EXITS_RAND: ExitName[]         = EXITS.filter(e => e !== 'none');
 
 // ── Override types ────────────────────────────────────────────────────────────
 
@@ -156,9 +171,9 @@ export type OverrideMap = Record<number, LineOverride>;
 
 export function pickEffects(rng: Prng, override?: EffectOverride): EffectSet {
   return {
-    entrance: override?.entrance ?? rng.pick(ENTRANCES),
-    idle: override?.idle ?? rng.pick(IDLES),
-    exit: override?.exit ?? rng.pick(EXITS),
+    entrance: override?.entrance ?? rng.pick(_ENTRANCES_RAND),
+    idle: override?.idle ?? rng.pick(_IDLES_RAND),
+    exit: override?.exit ?? rng.pick(_EXITS_RAND),
   };
 }
 

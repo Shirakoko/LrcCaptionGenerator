@@ -45,6 +45,65 @@ function drawLineChars(
   strokeColor: string,
   strokeWidth: number,
 ): void {
+  drawLineDecorations(ctx, line);
+  drawLineText(ctx, line, fontFamily, fillColor, strokeColor, strokeWidth);
+}
+
+// Draw only the background decorations (shapes behind each character).
+function drawLineDecorations(
+  ctx: CanvasRenderingContext2D,
+  line: LineState,
+): void {
+  const dec = line.decoration;
+  if (!dec?.enabled) return;
+
+  const { layout, chars, alpha, scaleX, scaleY } = line;
+  const { x, y, fontSize, rotation } = layout;
+  const lineFontFamily = line.fontFamily ?? 'sans-serif';
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.rotate(rotation * (Math.PI / 180));
+  ctx.scale(scaleX, scaleY);
+  ctx.font = `${fontSize}px "${lineFontFamily}"`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+
+  ctx.fillStyle = dec.color;
+  for (const c of chars) {
+    if (c.alpha <= 0) continue;
+    if (c.char.trim() === '') continue;
+    const cx = c.x - x;
+    const cy = c.y - y;
+    const s = dec.randomSize ? dec.size * c.decoSizeScale : dec.size;
+    if (dec.shape === 'rect') {
+      ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
+    } else if (dec.shape === 'diamond') {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillRect(-s, -s, s * 2, s * 2);
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(cx, cy, s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+// Draw only the text characters (no decorations).
+function drawLineText(
+  ctx: CanvasRenderingContext2D,
+  line: LineState,
+  fontFamily: string,
+  fillColor: string,
+  strokeColor: string,
+  strokeWidth: number,
+): void {
   const { layout, chars, alpha, scaleX, scaleY } = line;
   const { x, y, fontSize, rotation } = layout;
   const lineFontFamily  = line.fontFamily  ?? fontFamily;
@@ -59,36 +118,6 @@ function drawLineChars(
   ctx.font = `${fontSize}px "${lineFontFamily}"`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
-
-  // ── Draw background decorations (behind text) ────────────────────────────
-  const dec = line.decoration;
-  if (dec?.enabled) {
-    ctx.save();
-    ctx.fillStyle = dec.color;
-    for (const c of chars) {
-      if (c.alpha <= 0) continue;
-      if (c.char.trim() === '') continue;
-      const cx = c.x - x;
-      const cy = c.y - y;
-      const s = dec.randomSize
-        ? dec.size * c.decoSizeScale
-        : dec.size;
-      if (dec.shape === 'rect') {
-        ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
-      } else if (dec.shape === 'diamond') {
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(Math.PI / 4);
-        ctx.fillRect(-s, -s, s * 2, s * 2);
-        ctx.restore();
-      } else {
-        ctx.beginPath();
-        ctx.arc(cx, cy, s, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    ctx.restore();
-  }
 
   for (const c of chars) {
     if (c.alpha <= 0) continue;
@@ -230,10 +259,13 @@ export function renderFrame(
       // Fast path — draw directly to main canvas
       drawLineChars(ctx, line, fontFamily, fillColor, strokeColor, strokeWidth);
     } else {
-      // Pixel-effects path — draw to offscreen then composite with effects
+      // Pixel-effects path:
+      // 1. Draw decorations directly onto main canvas (unaffected by pixel fx)
+      drawLineDecorations(ctx, line);
+      // 2. Draw only text onto offscreen canvas, apply pixel fx, composite back
       applyPixelFxToLine(
         ctx,
-        (offCtx) => drawLineChars(offCtx, line, fontFamily, fillColor, strokeColor, strokeWidth),
+        (offCtx) => drawLineText(offCtx, line, fontFamily, fillColor, strokeColor, strokeWidth),
         activePixelFx,
         width, height,
       );

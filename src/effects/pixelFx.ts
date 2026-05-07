@@ -1,16 +1,18 @@
 import type { PixelFxEntry } from './types.ts';
+import { WebGLPipeline } from './webgl/WebGLPipeline.ts';
 
-// Shared offscreen canvas — resized as needed, cleared before each use
+// ── Shared offscreen 2D canvas (for text rendering) ───────────────────────────
+
 let _offscreen: HTMLCanvasElement | null = null;
 let _offCtx: CanvasRenderingContext2D | null = null;
 
 function getOffscreen(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   if (!_offscreen) {
     _offscreen = document.createElement('canvas');
-    _offCtx = _offscreen.getContext('2d', { willReadFrequently: true })!;
+    _offCtx = _offscreen.getContext('2d')!;
   }
   if (_offscreen.width !== w || _offscreen.height !== h) {
-    _offscreen.width = w;
+    _offscreen.width  = w;
     _offscreen.height = h;
   } else {
     _offCtx!.clearRect(0, 0, w, h);
@@ -18,67 +20,46 @@ function getOffscreen(w: number, h: number): [HTMLCanvasElement, CanvasRendering
   return [_offscreen, _offCtx!];
 }
 
-// ── Pixel manipulation effects (operate on offscreen ImageData) ───────────────
+// ── Shared WebGL pipeline (lazy-initialised) ──────────────────────────────────
 
-function applyGrain(
-  offCtx: CanvasRenderingContext2D,
-  params: Record<string, number | string>,
-  w: number, h: number,
-): void {
-  const intensity = Number(params.intensity ?? 0.3);
-  const imageData = offCtx.getImageData(0, 0, w, h);
-  const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    if (data[i + 3] < 5) continue;
-    const noise = (Math.random() * 2 - 1) * intensity * 255;
-    data[i]     = Math.max(0, Math.min(255, data[i]     + noise));
-    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+let _pipeline: WebGLPipeline | null = null;
+
+function getPipeline(w: number, h: number): WebGLPipeline {
+  if (!_pipeline) {
+    _pipeline = new WebGLPipeline(w, h);
+  } else {
+    _pipeline.resize(w, h);
   }
-  offCtx.putImageData(imageData, 0, 0);
+  return _pipeline;
 }
 
-function applyPixelate(
-  offCtx: CanvasRenderingContext2D,
-  params: Record<string, number | string>,
-  w: number, h: number,
-): void {
-  const block = Math.max(2, Math.round(Number(params.blockSize ?? 8)));
-  const imageData = offCtx.getImageData(0, 0, w, h);
-  const src = imageData.data;
-  const out = new Uint8ClampedArray(src);
+// ── Colour helper ─────────────────────────────────────────────────────────────
 
-  for (let by = 0; by < h; by += block) {
-    for (let bx = 0; bx < w; bx += block) {
-      let r = 0, g = 0, b = 0, a = 0, n = 0;
-      const maxY = Math.min(by + block, h);
-      const maxX = Math.min(bx + block, w);
-      for (let py = by; py < maxY; py++) {
-        for (let px = bx; px < maxX; px++) {
-          const idx = (py * w + px) * 4;
-          r += src[idx]; g += src[idx + 1]; b += src[idx + 2]; a += src[idx + 3];
-          n++;
-        }
-      }
-      if (n === 0) continue;
-      const ar = r/n|0, ag = g/n|0, ab = b/n|0, aa = a/n|0;
-      for (let py = by; py < maxY; py++) {
-        for (let px = bx; px < maxX; px++) {
-          const idx = (py * w + px) * 4;
-          out[idx] = ar; out[idx + 1] = ag; out[idx + 2] = ab; out[idx + 3] = aa;
-        }
-      }
-    }
+function hexToRgb01(hex: string): [number, number, number] {
+  const c = hex.replace('#', '');
+  const len = c.length;
+  if (len === 3) {
+    return [
+      parseInt(c[0] + c[0], 16) / 255,
+      parseInt(c[1] + c[1], 16) / 255,
+      parseInt(c[2] + c[2], 16) / 255,
+    ];
   }
-  offCtx.putImageData(new ImageData(out, w, h), 0, 0);
+  return [
+    parseInt(c.slice(0, 2), 16) / 255,
+    parseInt(c.slice(2, 4), 16) / 255,
+    parseInt(c.slice(4, 6), 16) / 255,
+  ];
 }
 
 // ── Main compositor ───────────────────────────────────────────────────────────
 
 /**
- * Draw a line to the offscreen canvas via `drawLine`, apply pixel effects,
- * then composite the result onto `mainCtx`.
- * `drawLine` should draw with the line's natural alpha baked in (no extra scaling needed).
+ * Draw a line to an offscreen 2D canvas via `drawLine`, apply WebGL pixel
+ * effects, then composite the result onto `mainCtx`.
+ *
+ * The external signature is identical to the old canvas-2D implementation so
+ * canvasRenderer.ts requires no changes.
  */
 export function applyPixelFxToLine(
   mainCtx: CanvasRenderingContext2D,
@@ -89,68 +70,63 @@ export function applyPixelFxToLine(
   const active = fxList.filter(fx => fx.enabled);
   if (active.length === 0) return;
 
+  // 1. Draw text onto the 2D offscreen canvas
   const [offscreen, offCtx] = getOffscreen(w, h);
   drawLine(offCtx);
 
-  // Pixel manipulation (operate in-place on offscreen)
-  for (const fx of active) {
-    if (fx.name === 'grain')    applyGrain(offCtx, fx.params, w, h);
-    if (fx.name === 'pixelate') applyPixelate(offCtx, fx.params, w, h);
+  // 2. Upload to WebGL
+  const pipeline = getPipeline(w, h);
+  pipeline.uploadSource(offscreen);
+
+  const now = performance.now() / 1000;
+
+  // 3. Execute passes in fixed order ─────────────────────────────────────────
+
+  // grain
+  const grainFx = active.find(fx => fx.name === 'grain');
+  if (grainFx) {
+    pipeline.runPass('grain', {
+      u_intensity: Number(grainFx.params.intensity ?? 0.3),
+      u_size:      Number(grainFx.params.size      ?? 1),
+      u_time:      now,
+    });
   }
 
-  // Build CSS filter string (blur + glow via drop-shadow)
-  const filterParts: string[] = [];
-  for (const fx of active) {
-    if (fx.name === 'blur') {
-      filterParts.push(`blur(${fx.params.radius}px)`);
-    }
-    if (fx.name === 'glow') {
-      const r = fx.params.radius;
-      const c = fx.params.color as string ?? '#ffffff';
-      filterParts.push(`drop-shadow(0 0 ${r}px ${c}) drop-shadow(0 0 ${Number(r) * 0.5}px ${c})`);
-    }
+  // pixelate
+  const pixelateFx = active.find(fx => fx.name === 'pixelate');
+  if (pixelateFx) {
+    pipeline.runPass('pixelate', {
+      u_blockSize: Math.max(2, Number(pixelateFx.params.blockSize ?? 8)),
+    });
   }
-  const cssFilter = filterParts.length ? filterParts.join(' ') : '';
 
-  // Chromatic aberration: composite 3 colour-shifted copies
+  // blur (standalone — not part of glow)
+  const blurFx = active.find(fx => fx.name === 'blur');
+  if (blurFx) {
+    const r = Number(blurFx.params.radius ?? 4);
+    pipeline.runPass('blur', { u_radius: r, u_direction: [1, 0] });
+    pipeline.runPass('blur', { u_radius: r, u_direction: [0, 1] });
+  }
+
+  // glow (blur + composite)
+  const glowFx = active.find(fx => fx.name === 'glow');
+  if (glowFx) {
+    const r     = Number(glowFx.params.radius ?? 10);
+    const color = hexToRgb01((glowFx.params.color as string | undefined) ?? '#ffffff');
+    pipeline.saveGlowSnapshot();
+    pipeline.runPass('blur', { u_radius: r, u_direction: [1, 0] });
+    pipeline.runPass('blur', { u_radius: r, u_direction: [0, 1] });
+    pipeline.runGlowComposite(color, 1.5);
+  }
+
+  // chromaticAberration
   const caFx = active.find(fx => fx.name === 'chromaticAberration');
   if (caFx) {
-    const offset = Number(caFx.params.offset ?? 4);
-
-    // Red shifted left
-    mainCtx.save();
-    mainCtx.globalCompositeOperation = 'screen';
-    mainCtx.globalAlpha = 0.75;
-    mainCtx.filter = (cssFilter ? cssFilter + ' ' : '') + 'sepia(1) saturate(10) hue-rotate(-30deg)';
-    mainCtx.drawImage(offscreen, -offset, 0);
-    mainCtx.restore();
-
-    // Green (centre)
-    mainCtx.save();
-    mainCtx.globalCompositeOperation = 'screen';
-    mainCtx.globalAlpha = 0.75;
-    mainCtx.filter = (cssFilter ? cssFilter + ' ' : '') + 'sepia(1) saturate(10) hue-rotate(80deg)';
-    mainCtx.drawImage(offscreen, 0, 0);
-    mainCtx.restore();
-
-    // Blue shifted right
-    mainCtx.save();
-    mainCtx.globalCompositeOperation = 'screen';
-    mainCtx.globalAlpha = 0.75;
-    mainCtx.filter = (cssFilter ? cssFilter + ' ' : '') + 'sepia(1) saturate(10) hue-rotate(190deg)';
-    mainCtx.drawImage(offscreen, offset, 0);
-    mainCtx.restore();
-
-    // Restore original at reduced opacity so the base text is still legible
-    mainCtx.save();
-    mainCtx.globalAlpha = 0.6;
-    if (cssFilter) mainCtx.filter = cssFilter;
-    mainCtx.drawImage(offscreen, 0, 0);
-    mainCtx.restore();
-  } else {
-    mainCtx.save();
-    if (cssFilter) mainCtx.filter = cssFilter;
-    mainCtx.drawImage(offscreen, 0, 0);
-    mainCtx.restore();
+    pipeline.runPass('chromaticAberration', {
+      u_offset: Number(caFx.params.offset ?? 4),
+    });
   }
+
+  // 4. Composite back onto the main 2D canvas
+  pipeline.composite(mainCtx);
 }

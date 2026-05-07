@@ -14,6 +14,9 @@ export function buildExit(
   rng: Prng,
   params: P = {},
 ): void {
+  // 'none': line stays fully visible until it's removed from the scene
+  if (name === 'none') return;
+
   const chars = line.chars;
   const n = chars.length;
 
@@ -107,6 +110,28 @@ export function buildExit(
         ease: 'power3.in',
       }, at);
       tl.to(line, { alpha: 0, duration: 0.05 }, at + duration);
+      break;
+    }
+
+    case 'particleFall': {
+      // Each character becomes a "particle": falls down, rotates, shrinks, and fades out
+      const fallDistance = params.fallDistance ?? 120;
+      const duration     = params.duration     ?? 0.6;
+      const spread       = params.spread       ?? 40;
+      for (let i = 0; i < n; i++) {
+        const c = chars[i];
+        const dir = rng.range(-1, 1); // left or right drift
+        tl.to(c, {
+          y: c.baseY + fallDistance + rng.range(0, fallDistance * 0.5),
+          x: c.baseX + dir * spread,
+          rotation: dir * rng.range(90, 270),
+          scaleX: rng.range(0.1, 0.4),
+          scaleY: rng.range(0.1, 0.4),
+          alpha: 0,
+          duration: duration + rng.range(0, 0.2),
+          ease: 'power2.in',
+        }, at + rng.range(0, 0.15));
+      }
       break;
     }
   }
