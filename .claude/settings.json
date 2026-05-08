@@ -1,0 +1,7 @@
+{
+  "skillOverrides": {
+    "add-effect": "on",
+    "add-transition": "on",
+    "add-decoration": "on"
+  }
+}
