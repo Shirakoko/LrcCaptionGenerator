@@ -511,14 +511,7 @@ export class TimelineController {
 
     el.append(thumb, name, dur, resizeHandle);
 
-    // ── Click to select ──────────────────────────────────────────────────────
-    el.addEventListener('mousedown', e => {
-      if ((e.target as HTMLElement).closest('.tl-clip-resize')) return;
-      this.selectedMediaId = clip.id;
-      this._renderMediaTrack();
-    });
-
-    // ── Drag to reorder ──────────────────────────────────────────────────────
+    // ── Click to select / drag to reorder ───────────────────────────────────
     el.addEventListener('mousedown', e => {
       if ((e.target as HTMLElement).closest('.tl-clip-resize')) return;
       e.preventDefault();
@@ -526,6 +519,7 @@ export class TimelineController {
       const startX = e.clientX;
       let dragging = false;
       let ghost: HTMLElement | null = null;
+      let indicator: HTMLElement | null = null;
       let insertIdx = this.mediaClips.findIndex(c => c.id === clip.id);
 
       const onMove = (ev: MouseEvent) => {
@@ -536,16 +530,20 @@ export class TimelineController {
           dragging = true;
           el.classList.add('tl-clip--dragging');
 
-          // Create ghost indicator
           ghost = document.createElement('div');
           ghost.className = 'tl-clip-drag-ghost';
           ghost.style.width = el.style.width;
           ghost.style.height = el.offsetHeight + 'px';
           this.mediaContentEl.appendChild(ghost);
+
+          indicator = document.createElement('div');
+          indicator.className = 'tl-drop-indicator';
+          indicator.style.height = el.offsetHeight + 'px';
+          this.mediaContentEl.appendChild(indicator);
         }
 
-        // Move ghost to cursor position (relative to track)
-        const trackRect = this.mediaContentEl.getBoundingClientRect();
+        // Move ghost to cursor position (relative to track content)
+        const trackRect = this.scrollAreaEl.getBoundingClientRect();
         const scrollLeft = this.scrollAreaEl.scrollLeft;
         const ghostX = ev.clientX - trackRect.left + scrollLeft - el.offsetWidth / 2;
         ghost!.style.left = Math.max(0, ghostX) + 'px';
@@ -561,12 +559,17 @@ export class TimelineController {
         }
         insertIdx = newIdx;
 
-        // Highlight drop position
-        this.mediaContentEl.querySelectorAll('.tl-clip--drop-target').forEach(
-          el => el.classList.remove('tl-clip--drop-target')
-        );
-        const targetEl = this.mediaContentEl.querySelectorAll<HTMLElement>('.tl-clip--media:not(.tl-clip--dragging)')[insertIdx];
-        targetEl?.classList.add('tl-clip--drop-target');
+        // Position the drop indicator between clips
+        let indicatorX: number;
+        if (newIdx === 0) {
+          indicatorX = 0;
+        } else if (newIdx >= others.length) {
+          const last = others[others.length - 1];
+          indicatorX = this._timeToPx(last.startTime + last.duration);
+        } else {
+          indicatorX = this._timeToPx(others[newIdx].startTime);
+        }
+        indicator!.style.left = indicatorX + 'px';
       };
 
       const onUp = () => {
@@ -576,9 +579,7 @@ export class TimelineController {
         if (dragging) {
           el.classList.remove('tl-clip--dragging');
           ghost?.remove();
-          this.mediaContentEl.querySelectorAll('.tl-clip--drop-target').forEach(
-            el => el.classList.remove('tl-clip--drop-target')
-          );
+          indicator?.remove();
 
           // Reorder array
           const origIdx = this.mediaClips.findIndex(c => c.id === clip.id);
@@ -591,6 +592,10 @@ export class TimelineController {
             this._updateInnerWidth();
             this._notify();
           }
+        } else {
+          // No drag — treat as click to select
+          this.selectedMediaId = clip.id;
+          this._renderMediaTrack();
         }
       };
 
