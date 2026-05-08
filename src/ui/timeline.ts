@@ -550,18 +550,15 @@ export class TimelineController {
         const ghostX = ev.clientX - trackRect.left + scrollLeft - el.offsetWidth / 2;
         ghost!.style.left = Math.max(0, ghostX) + 'px';
 
-        // Determine insert position by comparing ghost center to clip centers
+        // Determine insert position by comparing ghost center to clip centers.
+        // Build an ordered list of the other clips and find where the ghost falls.
         const ghostCenter = ghostX + el.offsetWidth / 2;
+        const others = this.mediaClips.filter(c => c.id !== clip.id);
         let newIdx = 0;
-        for (let i = 0; i < this.mediaClips.length; i++) {
-          const c = this.mediaClips[i];
-          if (c.id === clip.id) continue;
-          const cCenter = this._timeToPx(c.startTime + c.duration / 2);
+        for (let i = 0; i < others.length; i++) {
+          const cCenter = this._timeToPx(others[i].startTime + others[i].duration / 2);
           if (ghostCenter > cCenter) newIdx = i + 1;
         }
-        // Adjust for the fact that the dragged clip is still in the array
-        const origIdx = this.mediaClips.findIndex(c => c.id === clip.id);
-        if (newIdx > origIdx) newIdx--;
         insertIdx = newIdx;
 
         // Highlight drop position

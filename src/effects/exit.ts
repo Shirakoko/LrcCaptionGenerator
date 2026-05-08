@@ -14,8 +14,12 @@ export function buildExit(
   rng: Prng,
   params: P = {},
 ): void {
-  // 'none': line stays fully visible until it's removed from the scene
-  if (name === 'none') return;
+  // 'none': snap invisible at the end of the line's duration (no animation)
+  if (name === 'none') {
+    const endSec = at + 0.5; // at = exitSec = endTime - 0.5, so at+0.5 = endTime
+    tl.set(line, { alpha: 0 }, endSec);
+    return;
+  }
 
   const chars = line.chars;
   const n = chars.length;
