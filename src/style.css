@@ -266,6 +266,29 @@ button.primary:hover { background: var(--accent-hover); border-color: var(--acce
   flex-shrink: 0;
 }
 
+/* Wrapper for color inputs — enables mixed-value overlay */
+.le-color-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.le-color-wrap--mixed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(128,128,128,0.55) 0px,
+    rgba(128,128,128,0.55) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  border: 1px solid var(--border);
+}
+
 #canvas-wrap {
   flex: 1;
   display: flex;
@@ -953,6 +976,18 @@ progress { width: 100%; height: 6px; border-radius: 3px; }
   width: 2px;
   left: 3px;
   background: #4a9eff;
+}
+
+/* ── Marquee (rubber-band) selection ── */
+.tl-marquee {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(124, 106, 247, 0.15);
+  border: 1px solid rgba(124, 106, 247, 0.6);
+  pointer-events: none;
+  display: none;
+  z-index: 10;
 }
 
 /* ── Transition button (⊕ between media clips) ── */

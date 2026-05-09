@@ -102,13 +102,17 @@ export class TimelineController {
   audioClips: AudioClip[] = [];
 
   private captionSegments: CaptionSegment[] = [];
-  private selectedCaptionId: string | null = null;
+  private selectedCaptionIds: Set<string> = new Set();
+  private lastAnchorCaptionIdx: number | null = null;
   private zoomIdx = DEFAULT_ZOOM_IDX;
 
   private onChangeCbs: Array<() => void> = [];
   private onSeekCb?: (t: number) => void;
   private onCaptionClickCbs: Array<(idx: number, t: number) => void> = [];
-  private onCaptionSelectChangeCbs: Array<(idx: number | null) => void> = [];
+  private onCaptionSelectChangeCbs: Array<(indices: number[]) => void> = [];
+
+  // Marquee (rubber-band) selection state
+  private _marqueeEl: HTMLElement | null = null;
 
   // Transition popover state
   private transPopoverEl: HTMLElement | null = null;
@@ -161,12 +165,22 @@ export class TimelineController {
   onCaptionClick(cb: (idx: number, t: number) => void): void {
     this.onCaptionClickCbs.push(cb);
   }
-  onCaptionSelectionChange(cb: (idx: number | null) => void): void {
+  onCaptionSelectionChange(cb: (indices: number[]) => void): void {
     this.onCaptionSelectChangeCbs.push(cb);
+  }
+
+  getSelectedCaptionIndices(): number[] {
+    return this.captionSegments
+      .map((s, i) => (this.selectedCaptionIds.has(s.id) ? i : -1))
+      .filter(i => i !== -1);
   }
 
   private _notify(): void { for (const cb of this.onChangeCbs) cb(); }
   private _seek(t: number): void { this.onSeekCb?.(t); }
+  private _notifySelectionChange(): void {
+    const indices = this.getSelectedCaptionIndices();
+    for (const cb of this.onCaptionSelectChangeCbs) cb(indices);
+  }
 
   // ── Coordinate helpers ─────────────────────────────────────────────────────
 
@@ -227,20 +241,22 @@ export class TimelineController {
 
   setCaptionLyrics(lyrics: LyricLine[]): void {
     this.captionSegments = this._lyricsToSegments(lyrics);
-    this.selectedCaptionId = null;
+    this.selectedCaptionIds.clear();
+    this.lastAnchorCaptionIdx = null;
     this._renderCaptionTrack();
     this._renderRuler();
     this._updateInnerWidth();
-    for (const cb of this.onCaptionSelectChangeCbs) cb(null);
+    this._notifySelectionChange();
   }
 
   clearCaptionSegments(): void {
     this.captionSegments = [];
-    this.selectedCaptionId = null;
+    this.selectedCaptionIds.clear();
+    this.lastAnchorCaptionIdx = null;
     this._renderCaptionTrack();
     this._renderRuler();
     this._updateInnerWidth();
-    for (const cb of this.onCaptionSelectChangeCbs) cb(null);
+    this._notifySelectionChange();
   }
 
   getCaptionAsLyrics(): LyricLine[] {
@@ -258,17 +274,21 @@ export class TimelineController {
       // Empty track: insert at time 0
       const newSeg: CaptionSegment = { id: uid(), text: '新字幕', start: 0, end: NEW_DUR, source: 'manual' };
       this.captionSegments.push(newSeg);
-      this.selectedCaptionId = newSeg.id;
+      this.selectedCaptionIds = new Set([newSeg.id]);
+      this.lastAnchorCaptionIdx = 0;
       this._renderCaptionTrack();
       this._renderRuler();
       this._updateInnerWidth();
-      for (const cb of this.onCaptionSelectChangeCbs) cb(0);
+      this._notifySelectionChange();
       for (const cb of this.onCaptionClickCbs) cb(0, 0);
       this._notify();
       return;
     }
 
-    const selectedIdx = this.captionSegments.findIndex(s => s.id === this.selectedCaptionId);
+    // Insert after the last selected segment (or the anchor)
+    const selectedIdx = this.lastAnchorCaptionIdx !== null
+      ? this.lastAnchorCaptionIdx
+      : this.captionSegments.findIndex(s => this.selectedCaptionIds.has(s.id));
     if (selectedIdx === -1) return; // No selection — button should be disabled
 
     const afterSeg = this.captionSegments[selectedIdx];
@@ -284,14 +304,15 @@ export class TimelineController {
     }
 
     this.captionSegments.splice(selectedIdx + 1, 0, newSeg);
-    this.selectedCaptionId = newSeg.id;
+    const newIdx = selectedIdx + 1;
+    this.selectedCaptionIds = new Set([newSeg.id]);
+    this.lastAnchorCaptionIdx = newIdx;
 
     this._renderCaptionTrack();
     this._renderRuler();
     this._updateInnerWidth();
 
-    const newIdx = selectedIdx + 1;
-    for (const cb of this.onCaptionSelectChangeCbs) cb(newIdx);
+    this._notifySelectionChange();
     for (const cb of this.onCaptionClickCbs) cb(newIdx, newStart);
     this._notify();
 
@@ -304,35 +325,39 @@ export class TimelineController {
   }
 
   deleteSelectedCaption(): void {
-    const idx = this.captionSegments.findIndex(s => s.id === this.selectedCaptionId);
-    if (idx === -1) return;
+    const selectedIndices = this.getSelectedCaptionIndices().sort((a, b) => b - a); // descending
+    if (selectedIndices.length === 0) return;
 
-    const deleted = this.captionSegments[idx];
+    // Delete all selected segments from highest index to lowest to preserve indices
+    for (const idx of selectedIndices) {
+      const deleted = this.captionSegments[idx];
+      if (this.captionSegments.length === 1) {
+        this.captionSegments = [];
+      } else if (idx === 0) {
+        this.captionSegments[1].start = deleted.start;
+        this.captionSegments.splice(0, 1);
+      } else {
+        this.captionSegments[idx - 1].end = deleted.end;
+        this.captionSegments.splice(idx, 1);
+      }
+    }
 
-    if (this.captionSegments.length === 1) {
-      this.captionSegments = [];
-      this.selectedCaptionId = null;
-      for (const cb of this.onCaptionSelectChangeCbs) cb(null);
-    } else if (idx === 0) {
-      // First segment: next segment's start moves to fill
-      this.captionSegments[1].start = deleted.start;
-      this.captionSegments.splice(0, 1);
-      this.selectedCaptionId = this.captionSegments[0].id;
-      for (const cb of this.onCaptionSelectChangeCbs) cb(0);
-      for (const cb of this.onCaptionClickCbs) cb(0, this.captionSegments[0].start);
-    } else {
-      // Non-first segment: previous segment's end extends to fill
-      this.captionSegments[idx - 1].end = deleted.end;
-      this.captionSegments.splice(idx, 1);
-      const newIdx = idx - 1;
-      this.selectedCaptionId = this.captionSegments[newIdx].id;
-      for (const cb of this.onCaptionSelectChangeCbs) cb(newIdx);
+    this.selectedCaptionIds.clear();
+    this.lastAnchorCaptionIdx = null;
+
+    // Select the segment just before the first deleted one (if any)
+    const firstDeletedIdx = selectedIndices[selectedIndices.length - 1]; // smallest (ascending)
+    if (this.captionSegments.length > 0) {
+      const newIdx = Math.min(firstDeletedIdx, this.captionSegments.length - 1);
+      this.selectedCaptionIds.add(this.captionSegments[newIdx].id);
+      this.lastAnchorCaptionIdx = newIdx;
       for (const cb of this.onCaptionClickCbs) cb(newIdx, this.captionSegments[newIdx].start);
     }
 
     this._renderCaptionTrack();
     this._renderRuler();
     this._updateInnerWidth();
+    this._notifySelectionChange();
     this._notify();
   }
 
@@ -811,7 +836,7 @@ export class TimelineController {
 
       const el = document.createElement('div');
       el.className = 'tl-clip tl-clip--caption';
-      if (seg.id === this.selectedCaptionId) el.classList.add('selected');
+      if (this.selectedCaptionIds.has(seg.id)) el.classList.add('selected');
       el.dataset.segId = seg.id;
       el.style.left = left + 'px';
       el.style.width = width + 'px';
@@ -825,12 +850,12 @@ export class TimelineController {
       const idx = i; // capture for closures
       el.addEventListener('click', e => {
         e.stopPropagation();
-        this._selectCaption(seg.id, idx);
+        this._selectCaption(seg.id, idx, e);
       });
 
       el.addEventListener('contextmenu', e => {
         e.preventDefault();
-        this._selectCaption(seg.id, idx);
+        this._selectCaption(seg.id, idx, e);
         if (confirm(`删除字幕 "${seg.text}"？`)) {
           this.deleteSelectedCaption();
         }
@@ -850,6 +875,22 @@ export class TimelineController {
         this._makeCaptionBorder(this.captionSegments.length - 1, true)
       );
     }
+
+    // Click on empty area clears selection
+    this.captionContentEl.addEventListener('click', e => {
+      if (e.target === this.captionContentEl) {
+        this.selectedCaptionIds.clear();
+        this.lastAnchorCaptionIdx = null;
+        this._updateCaptionSelectionStyles();
+        this._notifySelectionChange();
+      }
+    });
+
+    // Marquee selection on mousedown in empty area
+    this.captionContentEl.addEventListener('mousedown', e => {
+      if (e.target !== this.captionContentEl) return;
+      this._startMarquee(e);
+    });
   }
 
   private _makeCaptionBorder(leftIdx: number, isRightEdge: boolean): HTMLElement {
@@ -931,21 +972,40 @@ export class TimelineController {
     document.addEventListener('mouseup', onUp);
   }
 
-  private _selectCaption(id: string, idx: number): void {
-    this.selectedCaptionId = id;
+  private _selectCaption(id: string, idx: number, e?: MouseEvent): void {
+    if (e?.ctrlKey || e?.metaKey) {
+      // Toggle
+      if (this.selectedCaptionIds.has(id)) {
+        this.selectedCaptionIds.delete(id);
+      } else {
+        this.selectedCaptionIds.add(id);
+      }
+      this.lastAnchorCaptionIdx = idx;
+    } else if (e?.shiftKey && this.lastAnchorCaptionIdx !== null) {
+      // Range select
+      const lo = Math.min(this.lastAnchorCaptionIdx, idx);
+      const hi = Math.max(this.lastAnchorCaptionIdx, idx);
+      this.selectedCaptionIds.clear();
+      for (let i = lo; i <= hi; i++) this.selectedCaptionIds.add(this.captionSegments[i].id);
+    } else {
+      // Plain click: single select
+      this.selectedCaptionIds = new Set([id]);
+      this.lastAnchorCaptionIdx = idx;
+    }
     this._updateCaptionSelectionStyles();
     const seg = this.captionSegments[idx];
     for (const cb of this.onCaptionClickCbs) cb(idx, seg.start);
-    for (const cb of this.onCaptionSelectChangeCbs) cb(idx);
+    this._notifySelectionChange();
   }
 
   /** Programmatically select a caption by index and scroll it into view. Does NOT fire onCaptionClick callbacks. */
   selectCaption(idx: number): void {
     const seg = this.captionSegments[idx];
     if (!seg) return;
-    this.selectedCaptionId = seg.id;
+    this.selectedCaptionIds = new Set([seg.id]);
+    this.lastAnchorCaptionIdx = idx;
     this._updateCaptionSelectionStyles();
-    for (const cb of this.onCaptionSelectChangeCbs) cb(idx);
+    this._notifySelectionChange();
     // Scroll the clip into view
     const x = this._timeToPx(seg.start);
     const viewW = this.scrollAreaEl.clientWidth;
@@ -954,10 +1014,68 @@ export class TimelineController {
     }
   }
 
+  /** Programmatically set multiple selected captions. Does NOT fire onCaptionClick callbacks. */
+  setSelectedCaptions(indices: number[]): void {
+    this.selectedCaptionIds.clear();
+    for (const idx of indices) {
+      const seg = this.captionSegments[idx];
+      if (seg) this.selectedCaptionIds.add(seg.id);
+    }
+    if (indices.length > 0) this.lastAnchorCaptionIdx = indices[indices.length - 1];
+    this._updateCaptionSelectionStyles();
+  }
+
   private _updateCaptionSelectionStyles(): void {
     this.captionContentEl.querySelectorAll<HTMLElement>('.tl-clip--caption').forEach(el => {
-      el.classList.toggle('selected', el.dataset.segId === this.selectedCaptionId);
+      el.classList.toggle('selected', this.selectedCaptionIds.has(el.dataset.segId ?? ''));
     });
+  }
+
+  // ── Marquee selection ──────────────────────────────────────────────────────
+
+  private _startMarquee(e: MouseEvent): void {
+    const rect = this.captionContentEl.getBoundingClientRect();
+    const startX = e.clientX - rect.left + this.scrollAreaEl.scrollLeft;
+
+    if (!this._marqueeEl) {
+      this._marqueeEl = document.createElement('div');
+      this._marqueeEl.className = 'tl-marquee';
+      this.captionContentEl.appendChild(this._marqueeEl);
+    }
+    const marqueeEl = this._marqueeEl;
+    marqueeEl.style.display = 'block';
+    marqueeEl.style.left = startX + 'px';
+    marqueeEl.style.width = '0px';
+
+    const onMove = (ev: MouseEvent) => {
+      const curX = ev.clientX - rect.left + this.scrollAreaEl.scrollLeft;
+      const lo = Math.min(startX, curX);
+      const hi = Math.max(startX, curX);
+      marqueeEl.style.left = lo + 'px';
+      marqueeEl.style.width = (hi - lo) + 'px';
+
+      // Highlight clips within range
+      const loTime = this._pxToTime(lo);
+      const hiTime = this._pxToTime(hi);
+      this.selectedCaptionIds.clear();
+      for (const seg of this.captionSegments) {
+        if (seg.start < hiTime && seg.end > loTime) {
+          this.selectedCaptionIds.add(seg.id);
+        }
+      }
+      this._updateCaptionSelectionStyles();
+    };
+
+    const onUp = () => {
+      marqueeEl.style.display = 'none';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      this._notifySelectionChange();
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
   }
 
   // ── Caption data helpers ───────────────────────────────────────────────────
@@ -1124,13 +1242,32 @@ export class TimelineController {
     document.addEventListener('keydown', e => {
       // Skip if typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'Delete') {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         if (this.selectedMediaId) {
           this.removeMediaClip(this.selectedMediaId);
           this.selectedMediaId = null;
-        } else if (this.selectedCaptionId) {
-          this.deleteSelectedCaption();
+        } else if (this.selectedCaptionIds.size > 0) {
+          const count = this.selectedCaptionIds.size;
+          const msg = count === 1
+            ? '确认删除选中的字幕？'
+            : `确认删除选中的 ${count} 条字幕？`;
+          if (confirm(msg)) this.deleteSelectedCaption();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        this.selectedCaptionIds = new Set(this.captionSegments.map(s => s.id));
+        if (this.captionSegments.length > 0) {
+          this.lastAnchorCaptionIdx = this.captionSegments.length - 1;
+        }
+        this._updateCaptionSelectionStyles();
+        this._notifySelectionChange();
+      } else if (e.key === 'Escape') {
+        if (this.selectedCaptionIds.size > 0) {
+          this.selectedCaptionIds.clear();
+          this.lastAnchorCaptionIdx = null;
+          this._updateCaptionSelectionStyles();
+          this._notifySelectionChange();
         }
       }
     });

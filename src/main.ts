@@ -147,23 +147,21 @@ timeline.onSeek(t => {
   updateTransport();
 });
 
-timeline.onCaptionClick((lineIdx, timeSec) => {
+timeline.onCaptionClick((_lineIdx, timeSec) => {
   if (!scene) return;
   scene.seek(timeSec);
   timeline.seekAudio(timeSec);
   timeline.syncPlayhead(timeSec);
-  // Only set line editor selection for lines that exist in the scene
-  if (lineEditor && lineIdx < scene.getLyrics().length) {
-    lineEditor.setSelected(lineIdx);
-  }
   updateTransport();
 });
 
 // Update caption "+" button state when selection changes
-timeline.onCaptionSelectionChange(idx => {
+timeline.onCaptionSelectionChange(indices => {
   const hasData = timeline.hasCaptionData();
-  tlCaptionAdd.disabled = idx === null && hasData;
-  tlCaptionAdd.title = idx === null && hasData ? '请先选中一条字幕' : '在选中字幕后插入';
+  tlCaptionAdd.disabled = indices.length === 0 && hasData;
+  tlCaptionAdd.title = indices.length === 0 && hasData ? '请先选中一条字幕' : '在选中字幕后插入';
+  // Sync right panel selection (without triggering timeline callback again)
+  if (lineEditor) lineEditor.setSelection(indices);
 });
 
 timeline.onChange(() => {
@@ -377,10 +375,13 @@ buildBtn.addEventListener('click', () => {
       timeline.syncPlayhead(t);
       updateTransport();
     });
-    // Sync timeline selection when a lyric is selected in the right panel
-    lineEditor.onLineSelect((idx: number | null) => {
-      if (idx === null) return;
-      timeline.selectCaption(idx);
+    // Sync timeline selection when lyrics are selected in the right panel
+    lineEditor.onLineSelect((indices: number[]) => {
+      if (indices.length === 1) {
+        timeline.selectCaption(indices[0]);
+      } else {
+        timeline.setSelectedCaptions(indices);
+      }
     });
   }
 
